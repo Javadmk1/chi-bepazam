@@ -1,4 +1,4 @@
-const fs = require('node:fs');
+import fs from 'node:fs';
 
 const gradlePath = 'android/app/build.gradle';
 let source = fs.readFileSync(gradlePath, 'utf8');

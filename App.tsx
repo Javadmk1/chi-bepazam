@@ -248,93 +248,32 @@ function AppContent() {
         );
       })}
       <Pressable style={styles.greenButton} onPress={async () => {
+        const needs = new Map<string, { quantity: number; unit: string }>();
         for (const meal of mealPlan) {
           const recipe = recipes.find(item => item.id === meal.recipe_id);
-          if (recipe) for (const ingredient of recipe.ingredients) {
-            const normalized = normalizeIngredient(ingredient.name);
-            const owned = pantry.find(item => normalizeIngredient(item.ingredient_name) === normalized);
-            const need = missingRecipeQuantity(ingredient.qty, owned?.quantity ?? 0, owned?.unit ?? "", preferences.household_size, 2);
-            if (need) await db.runAsync("INSERT INTO shopping_items (ingredient_name, quantity, unit) VALUES (?, ?, ?) ON CONFLICT(ingredient_name) WHERE checked = 0 DO UPDATE SET quantity = quantity + excluded.quantity, unit = excluded.unit", normalized, need.quantity, need.unit);
+          if (!recipe) continue;
+          for (const ingredient of recipe.ingredients) {
+            const parsed = missingRecipeQuantity(ingredient.qty, 0, "", preferences.household_size, 2);
+            if (!parsed) continue;
+            const name = normalizeIngredient(ingredient.name);
+            const current = needs.get(name);
+            if (!current) needs.set(name, { quantity: parsed.quantity, unit: parsed.unit });
+            else if (current.unit === parsed.unit) current.quantity += parsed.quantity;
           }
+        }
+        for (const [name, need] of needs) {
+          const stock = pantry.find(item => normalizeIngredient(item.ingredient_name) === name);
+          const available = stock?.unit === need.unit ? stock.quantity : 0;
+          const missing = Math.max(0, Math.round((need.quantity - available) * 100) / 100);
+          if (missing > 0) await db.runAsync(
+            "INSERT INTO shopping_items (ingredient_name, quantity, unit) VALUES (?, ?, ?) ON CONFLICT(ingredient_name) WHERE checked = 0 DO UPDATE SET quantity = quantity + excluded.quantity, unit = excluded.unit",
+            name, missing, need.unit
+          );
         }
         await loadData();
         setTab("لیست خرید");
-        Alert.alert("لیست خرید آماده شد", "کسری مواد دستورهای برنامه‌ریزی‌شده با مقیاس تعداد نفرات محاسبه شد.");
+        Alert.alert("لیست خرید آماده شد", "مواد برنامه هفتگی پس از تجمیع نیاز همه وعده‌ها و کسر یک‌باره موجودی انبار محاسبه شدند.");
       }}><Ionicons name="cart-outline" color={C.white} size={18}/><Text style={styles.greenButtonText}>ساخت لیست خرید هفتگی</Text></Pressable>
-    </ScrollView>
-  );
-
-  const savePreferences = async (next: UserPreferences) => {
-    await db.runAsync("UPDATE user_preferences SET diet = ?, allergies_json = ?, household_size = ?, weekly_budget = ? WHERE id = 1", next.diet, next.allergies_json, next.household_size, next.weekly_budget);
-    setPreferences(next);
-  };
-
-  const Settings = () => (
-    <ScrollView contentContainerStyle={styles.page}>
-      <Header title="تنظیمات" subtitle="ترجیحات روی همین دستگاه ذخیره می‌شوند" />
-      <View style={styles.profile}><Ionicons name="person-circle-outline" size={48} color={C.gold}/><View style={{flex:1}}><Text style={styles.listTitle}>حساب مهمان</Text><Text style={styles.muted}>بدون نیاز به ثبت‌نام</Text></View></View>
-      <SectionTitle title="الگوی غذایی"/>
-      <Text style={styles.muted}>غذاهای پیشنهادی براساس این انتخاب فیلتر می‌شوند.</Text>
-      <View style={styles.filterRow}>{["همه", "گیاهی"].map(option => <Pressable key={option} onPress={() => savePreferences({...preferences, diet: option})} style={[styles.chip, preferences.diet === option && styles.chipActive]}><Text style={[styles.chipText, preferences.diet === option && styles.chipTextActive]}>{option}</Text></Pressable>)}</View>
-      <SectionTitle title="حساسیت‌ها و مواد ممنوع"/>
-      <Text style={styles.muted}>نام مواد را با ویرگول جدا کن؛ غذاهایی که ماده‌ای با نام منطبق دارند از پیشنهادها حذف می‌شوند.</Text>
-      <TextInput value={allergyInput} onChangeText={setAllergyInput} placeholder="مثلاً شیر، بادام‌زمینی، تخم‌مرغ" placeholderTextColor={C.muted} style={styles.input}/>
-      <Pressable style={styles.greenButton} onPress={() => {
-        const values = [...new Set(allergyInput.split(/[,،]/).map(x => normalizeIngredient(x.trim())).filter(Boolean))];
-        savePreferences({...preferences, allergies_json: JSON.stringify(values)}).then(() => Alert.alert("ذخیره شد", "فیلتر مواد انتخاب‌شده در پیشنهاد غذا اعمال شد."));
-      }}><Text style={styles.greenButtonText}>ذخیره حساسیت‌ها</Text></Pressable>
-      <SectionTitle title="تعداد نفرات"/>
-      <Text style={styles.muted}>مقدار مواد دستورها برای تعداد انتخاب‌شده مقیاس می‌شود. برای مواد با واحد متفاوت از انبار، مقدار کامل دستور در لیست خرید می‌آید.</Text>
-      <View style={[styles.filterRow, {alignItems:"center"}]}>
-        <Pressable style={styles.chip} onPress={() => savePreferences({...preferences, household_size: Math.max(1, preferences.household_size - 1)})}><Text style={styles.chipText}>−</Text></Pressable>
-        <Text style={styles.listTitle}>{preferences.household_size} نفر</Text>
-        <Pressable style={styles.chip} onPress={() => savePreferences({...preferences, household_size: Math.min(20, preferences.household_size + 1)})}><Text style={styles.chipText}>+</Text></Pressable>
-      </View>
-      <View style={styles.tip}><Ionicons name="information-circle-outline" color={C.gold} size={20}/><Text style={styles.tipText}>فیلتر حساسیت فقط مواد ثبت‌شده در دستورها را بررسی می‌کند؛ آلودگی متقاطع یا مواد اعلام‌نشده را پوشش نمی‌دهد. در حساسیت شدید، صرفاً به این فیلتر تکیه نکن.</Text></View>
-      <Pressable style={styles.settingRow} onPress={() => Alert.alert("همگام‌سازی", "اتصال Supabase هنوز پیاده‌سازی نشده است.")}><Ionicons name="cloud-outline" size={20} color={C.gold}/><Text style={styles.listTitle}>پشتیبان‌گیری و همگام‌سازی</Text></Pressable>
-      <Pressable style={styles.settingRow} onPress={() => Alert.alert("چی بپزم؟", "نسخه آزمایشی محلی") }><Ionicons name="information-circle-outline" size={20} color={C.gold}/><Text style={styles.listTitle}>درباره برنامه</Text></Pressable>
-    </ScrollView>
-  );
-
-  const tabs = [
-    { name: "خانه", icon: "home-outline" },
-    { name: "انبار", icon: "basket-outline" },
-    { name: "پیشنهادها", icon: "restaurant-outline" },
-    { name: "لیست خرید", icon: "cart-outline" },
-    { name: "برنامه", icon: "calendar-outline" },
-    { name: "تنظیمات", icon: "settings-outline" }
-  ] as const;
-
-  return (
-    <SafeAreaView style={styles.safe}>
-      <StatusBar barStyle="light-content" backgroundColor={C.bg}/>
-      <View style={styles.content}>
-        {selected ? (
-          <ScrollView contentContainerStyle={styles.page}>
-            <Pressable onPress={() => setSelected(null)} style={styles.back}><Ionicons name="arrow-forward" size={21} color={C.text}/><Text style={styles.backText}>بازگشت</Text></Pressable>
-            <View style={styles.detailHero}><Text style={styles.detailEmoji}>{selected.image}</Text></View>
-            <Text style={styles.detailTitle}>{selected.title}</Text><Text style={styles.muted}>{selected.subtitle}</Text>
-            <View style={styles.metaPanel}><Text style={styles.metaText}>⏱ {selected.timeMin} دقیقه</Text><Text style={styles.metaText}>🔥 {selected.calories} کالری</Text><Text style={styles.metaText}>⭐ {selected.rating}</Text></View>
-            <SectionTitle title="مواد لازم"/>
-            {selected.ingredients.map(x => <View key={x.name} style={styles.ingredientLine}><Text style={styles.listTitle}>{x.name}</Text><Text style={styles.muted}>{scaledRecipeQuantity(x.qty, preferences.household_size, 2)}</Text></View>)}
-            <SectionTitle title="مراحل پخت"/>
-            {selected.steps.map((x, i) => <View key={x} style={styles.step}><Text style={styles.stepNum}>{i + 1}</Text><Text style={styles.stepText}>{x}</Text></View>)}
-            <Pressable style={styles.greenButton} onPress={() => addRecipeToShopping(selected)}><Ionicons name="cart-outline" color={C.white} size={19}/><Text style={styles.greenButtonText}>افزودن مواد به لیست خرید</Text></Pressable>
-          </ScrollView>
-        ) : tab === "خانه" ? <Home/> : tab === "انبار" ? <Pantry/> : tab === "پیشنهادها" ? <Suggestions/> : tab === "لیست خرید" ? <Shopping/> : tab === "برنامه" ? <Plan/> : <Settings/>}
-      </View>
-      <View style={styles.tabBar}>{tabs.map(t => <Pressable key={t.name} onPress={() => { setSelected(null); setTab(t.name); }} style={styles.tabItem}><Ionicons name={t.icon as keyof typeof Ionicons.glyphMap} size={21} color={tab === t.name ? C.gold : C.muted}/><Text style={[styles.tabLabel, tab === t.name && styles.tabLabelActive]}>{t.name}</Text></Pressable>)}</View>
-      <Modal visible={!!planPickerDate} transparent animationType="slide" onRequestClose={() => setPlanPickerDate(null)}>
-        <View style={styles.modalShade}>
-          <View style={[styles.modalCard, { maxHeight: "82%" }]}>
-            <Text style={styles.modalTitle}>انتخاب غذا برای برنامه</Text>
-            <ScrollView>
-              {recipes.map(recipe => (
-                <Pressable key={recipe.id} style={styles.recipeCard} onPress={() => addMealToSelectedDay(recipe)}>
-                  <View style={styles.foodThumb}><Text style={styles.foodEmoji}>{recipe.image}</Text></View>
-                  <View style={styles.recipeInfo}><Text style={styles.recipeTitle}>{recipe.title}</Text><Text style={styles.muted}>{recipe.timeMin} دقیقه</Text></View>
-                  <Ionicons name="add-circle" color={C.green2} size={22}/>
-                </Pressable>
               ))}
             </ScrollView>
             <Pressable style={styles.cancelButton} onPress={() => setPlanPickerDate(null)}><Text style={styles.cancelText}>بستن</Text></Pressable>

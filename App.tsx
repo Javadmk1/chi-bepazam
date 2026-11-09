@@ -421,31 +421,45 @@ function AppContent() {
       return;
     }
     const email = cloudEmail.trim().toLowerCase();
-    if (!/^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/.test(email)) {
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
       Alert.alert("ایمیل نامعتبر", "یک نشانی ایمیل معتبر وارد کن.");
       return;
     }
+    if (cloudBusy) return;
     setCloudBusy(true);
-    const { error } = await supabase.auth.signInWithOtp({ email, options: { shouldCreateUser: true } });
-    setCloudBusy(false);
-    if (error) Alert.alert("ارسال کد ناموفق بود", error.message);
-    else { setCloudCodeSent(true); Alert.alert("کد ارسال شد", "کد ورود را از ایمیلت بردار و اینجا وارد کن."); }
+    try {
+      const { error } = await supabase.auth.signInWithOtp({ email, options: { shouldCreateUser: true } });
+      if (error) throw error;
+      setCloudCodeSent(true);
+      Alert.alert("کد ارسال شد", "کد ورود را از ایمیلت بردار و اینجا وارد کن.");
+    } catch (error: any) {
+      Alert.alert("ارسال کد ناموفق بود", error?.message ?? "ارسال کد ورود انجام نشد.");
+    } finally {
+      setCloudBusy(false);
+    }
   };
 
   const verifyCloudCode = async () => {
-    if (!supabase) return;
-    const token = cloudCode.trim().replace(/\\s/g, "");
-    if (!/^\\d{6}$/.test(token)) { Alert.alert("کد نامعتبر", "کد شش‌رقمی ایمیل را وارد کن."); return; }
+    if (!supabase || cloudBusy) return;
+    const email = cloudEmail.trim().toLowerCase();
+    const token = cloudCode.trim().replace(/\s/g, "");
+    if (!/^\d{6}$/.test(token)) {
+      Alert.alert("کد نامعتبر", "کد شش‌رقمی ایمیل را وارد کن.");
+      return;
+    }
     setCloudBusy(true);
-    const { data, error } = await supabase.auth.verifyOtp({ email: cloudEmail.trim().toLowerCase(), token, type: "email" });
-    setCloudBusy(false);
-    if (error) Alert.alert("ورود ناموفق بود", error.message);
-    else {
-      setCloudUserEmail(data.user?.email ?? cloudEmail.trim());
+    try {
+      const { data, error } = await supabase.auth.verifyOtp({ email, token, type: "email" });
+      if (error) throw error;
+      setCloudUserEmail(data.user?.email ?? email);
       setCloudCodeSent(false);
       setCloudCode("");
       await loadData();
       Alert.alert("ورود موفق", "حساب متصل شد و همگام‌سازی اولیه انجام شد.");
+    } catch (error: any) {
+      Alert.alert("ورود ناموفق بود", error?.message ?? "کد ورود تأیید نشد.");
+    } finally {
+      setCloudBusy(false);
     }
   };
 

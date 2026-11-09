@@ -31,6 +31,7 @@ export const ingredientSeeds: IngredientSeed[] = [
   { name: "هویج", category: "سبزیجات", unit: "عدد", aliases: ["carrot"] },
   { name: "تن ماهی", category: "گوشت و پروتئین", unit: "قوطی", aliases: ["تن", "tuna"] },
   { name: "ذرت", category: "سبزیجات", unit: "گرم", aliases: ["corn"] }
+];
 
 export function normalizeIngredient(input: string): string {
   const clean = input.trim().toLocaleLowerCase("fa").replace(/[ي]/g, "ی").replace(/[ك]/g, "ک").replace(/\s+/g, " ");

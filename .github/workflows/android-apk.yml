@@ -1,7 +1,7 @@
 name: Build Android test APK
 
 concurrency:
-  group: android-apk-${{ github.ref }}
+  group: android-apk-build-${{ github.ref }}
   cancel-in-progress: true
 
 on:

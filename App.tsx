@@ -61,6 +61,17 @@ function AppContent() {
   const [cloudSyncMessage, setCloudSyncMessage] = useState("هنوز همگام‌سازی نشده");
 
   const loadData = async () => {
+    if (supabase) {
+      try {
+        const { data } = await supabase.auth.getSession();
+        if (data.session?.user.id) {
+          await syncUserData(db, supabase, data.session.user.id);
+          setCloudSyncMessage("همگام‌سازی خودکار موفق · " + new Date().toLocaleTimeString("fa-IR"));
+        }
+      } catch {
+        setCloudSyncMessage("همگام‌سازی خودکار ناموفق بود");
+      }
+    }
     const p = await db.getAllAsync<PantryItem>("SELECT id, ingredient_name, quantity, unit, expires_at FROM pantry WHERE deleted = 0 ORDER BY ingredient_name");
     const s = await db.getAllAsync<ShoppingItem>("SELECT id, ingredient_name, quantity, unit, checked FROM shopping_items WHERE deleted = 0 ORDER BY checked, ingredient_name");
     const plan = await db.getAllAsync<PlanItem>("SELECT id, meal_date, meal_type, recipe_id FROM meal_plan WHERE deleted = 0 ORDER BY meal_date");
@@ -399,6 +410,7 @@ function AppContent() {
   const savePreferences = async (next: UserPreferences) => {
     await db.runAsync("UPDATE user_preferences SET diet = ?, allergies_json = ?, household_size = ?, weekly_budget = ?, updated_at = CURRENT_TIMESTAMP WHERE id = 1", next.diet, next.allergies_json, next.household_size, next.weekly_budget);
     setPreferences(next);
+    await loadData();
   };
 
   const requestCloudCode = async () => {

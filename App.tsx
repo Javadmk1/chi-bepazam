@@ -13,6 +13,7 @@ import { rankRecipes } from "./src/engine/matcher";
 import { missingRecipeQuantity, scaledRecipeQuantity } from "./src/data/recipe-quantity";
 import { expiryLabel, getExpiryStatus } from "./src/data/expiry";
 import { supabase, supabaseConfigured } from "./src/lib/supabase";
+import { syncUserData } from "./src/lib/sync";
 
 type PantryItem = { id: number; ingredient_name: string; quantity: number; unit: string; expires_at?: string | null };
 type UserPreferences = { diet: string; allergies_json: string; household_size: number; weekly_budget: number };
@@ -56,11 +57,13 @@ function AppContent() {
   const [cloudCodeSent, setCloudCodeSent] = useState(false);
   const [cloudUserEmail, setCloudUserEmail] = useState<string | null>(null);
   const [cloudBusy, setCloudBusy] = useState(false);
+  const [cloudSyncBusy, setCloudSyncBusy] = useState(false);
+  const [cloudSyncMessage, setCloudSyncMessage] = useState("هنوز همگام‌سازی نشده");
 
   const loadData = async () => {
     const p = await db.getAllAsync<PantryItem>("SELECT id, ingredient_name, quantity, unit, expires_at FROM pantry WHERE deleted = 0 ORDER BY ingredient_name");
-    const s = await db.getAllAsync<ShoppingItem>("SELECT id, ingredient_name, quantity, unit, checked FROM shopping_items ORDER BY checked, ingredient_name");
-    const plan = await db.getAllAsync<PlanItem>("SELECT id, meal_date, meal_type, recipe_id FROM meal_plan ORDER BY meal_date");
+    const s = await db.getAllAsync<ShoppingItem>("SELECT id, ingredient_name, quantity, unit, checked FROM shopping_items WHERE deleted = 0 ORDER BY checked, ingredient_name");
+    const plan = await db.getAllAsync<PlanItem>("SELECT id, meal_date, meal_type, recipe_id FROM meal_plan WHERE deleted = 0 ORDER BY meal_date");
     const prefs = await db.getFirstAsync<UserPreferences>("SELECT diet, allergies_json, household_size, weekly_budget FROM user_preferences WHERE id = 1");
     setPantry(p);
     setShopping(s);
@@ -129,12 +132,12 @@ function AppContent() {
   };
 
   const toggleShopping = async (item: ShoppingItem) => {
-    await db.runAsync("UPDATE shopping_items SET checked = ? WHERE id = ?", item.checked ? 0 : 1, item.id);
+    await db.runAsync("UPDATE shopping_items SET checked = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?", item.checked ? 0 : 1, item.id);
     await loadData();
   };
 
   const removeShopping = async (item: ShoppingItem) => {
-    await db.runAsync("DELETE FROM shopping_items WHERE id = ?", item.id);
+    await db.runAsync("UPDATE shopping_items SET deleted = 1, updated_at = CURRENT_TIMESTAMP WHERE id = ?", item.id);
     await loadData();
   };
 
@@ -167,7 +170,7 @@ function AppContent() {
       const need = missingRecipeQuantity(item.qty, owned?.quantity ?? 0, owned?.unit ?? "", preferences.household_size, 2);
       if (need) {
         await db.runAsync(
-          "INSERT INTO shopping_items (ingredient_name, quantity, unit) VALUES (?, ?, ?) ON CONFLICT(ingredient_name) WHERE checked = 0 DO UPDATE SET quantity = quantity + excluded.quantity, unit = excluded.unit",
+          "INSERT INTO shopping_items (ingredient_name, quantity, unit, updated_at, deleted) VALUES (?, ?, ?, CURRENT_TIMESTAMP, 0) ON CONFLICT(ingredient_name) WHERE checked = 0 DO UPDATE SET quantity = quantity + excluded.quantity, unit = excluded.unit, updated_at = CURRENT_TIMESTAMP",
           normalized, need.quantity, need.unit
         );
       }
@@ -299,7 +302,7 @@ function AppContent() {
           }
           transferred.push(item.id);
         }
-        for (const id of transferred) await db.runAsync("DELETE FROM shopping_items WHERE id = ?", id);
+        for (const id of transferred) await db.runAsync("UPDATE shopping_items SET deleted = 1, updated_at = CURRENT_TIMESTAMP WHERE id = ?", id);
         await loadData();
         if (unitMismatches.length) {
           Alert.alert("بعضی مواد منتقل نشدند", "واحد این مواد با واحد ثبت‌شده در انبار متفاوت است؛ برای جلوگیری از جمع‌زدن مقدارهای ناسازگار، آن‌ها در لیست خرید باقی ماندند: " + unitMismatches.join("، "));
@@ -324,13 +327,13 @@ function AppContent() {
 
   const addMealToSelectedDay = async (recipe: Recipe) => {
     if (!planPickerDate) return;
-    await db.runAsync("INSERT INTO meal_plan (meal_date, meal_type, recipe_id) VALUES (?, ?, ?)", planPickerDate, "شام", recipe.id);
+    await db.runAsync("INSERT INTO meal_plan (meal_date, meal_type, recipe_id, updated_at, deleted) VALUES (?, ?, ?, CURRENT_TIMESTAMP, 0)", planPickerDate, "شام", recipe.id);
     setPlanPickerDate(null);
     await loadData();
   };
 
   const removeMeal = async (id: number) => {
-    await db.runAsync("DELETE FROM meal_plan WHERE id = ?", id);
+    await db.runAsync("UPDATE meal_plan SET deleted = 1, updated_at = CURRENT_TIMESTAMP WHERE id = ?", id);
     await loadData();
   };
 
@@ -376,7 +379,7 @@ function AppContent() {
           const available = stock?.unit === need.unit ? stock.quantity : 0;
           const missing = Math.max(0, Math.round((need.quantity - available) * 100) / 100);
           if (missing > 0) await db.runAsync(
-            "INSERT INTO shopping_items (ingredient_name, quantity, unit) VALUES (?, ?, ?) ON CONFLICT(ingredient_name) WHERE checked = 0 DO UPDATE SET quantity = quantity + excluded.quantity, unit = excluded.unit",
+            "INSERT INTO shopping_items (ingredient_name, quantity, unit, updated_at, deleted) VALUES (?, ?, ?, CURRENT_TIMESTAMP, 0) ON CONFLICT(ingredient_name) WHERE checked = 0 DO UPDATE SET quantity = quantity + excluded.quantity, unit = excluded.unit, updated_at = CURRENT_TIMESTAMP",
             name, missing, need.unit
           );
         }
@@ -388,7 +391,7 @@ function AppContent() {
   );
 
   const savePreferences = async (next: UserPreferences) => {
-    await db.runAsync("UPDATE user_preferences SET diet = ?, allergies_json = ?, household_size = ?, weekly_budget = ? WHERE id = 1", next.diet, next.allergies_json, next.household_size, next.weekly_budget);
+    await db.runAsync("UPDATE user_preferences SET diet = ?, allergies_json = ?, household_size = ?, weekly_budget = ?, updated_at = CURRENT_TIMESTAMP WHERE id = 1", next.diet, next.allergies_json, next.household_size, next.weekly_budget);
     setPreferences(next);
   };
 
@@ -425,6 +428,36 @@ function AppContent() {
     }
   };
 
+  const syncCloudNow = async () => {
+    if (!supabase) {
+      Alert.alert("اتصال آماده نیست", "ابتدا متغیرهای Supabase را در تنظیمات ساخت وارد کن.");
+      return;
+    }
+    setCloudSyncBusy(true);
+    try {
+      const { data, error } = await supabase.auth.getSession();
+      if (error) throw error;
+      if (!data.session?.user.id) {
+        Alert.alert("ورود لازم است", "ابتدا با ایمیل وارد حساب ابری شو.");
+        return;
+      }
+      await syncUserData(db, supabase, data.session.user.id);
+      const p = await db.getAllAsync<PantryItem>("SELECT id, ingredient_name, quantity, unit, expires_at FROM pantry WHERE deleted = 0 ORDER BY ingredient_name");
+      const sh = await db.getAllAsync<ShoppingItem>("SELECT id, ingredient_name, quantity, unit, checked FROM shopping_items WHERE deleted = 0 ORDER BY checked, ingredient_name");
+      const pl = await db.getAllAsync<PlanItem>("SELECT id, meal_date, meal_type, recipe_id FROM meal_plan WHERE deleted = 0 ORDER BY meal_date");
+      const prefs = await db.getFirstAsync<UserPreferences>("SELECT diet, allergies_json, household_size, weekly_budget FROM user_preferences WHERE id = 1");
+      setPantry(p); setShopping(sh); setMealPlan(pl);
+      if (prefs) setPreferences(prefs);
+      setCloudSyncMessage("همگام‌سازی موفق · " + new Date().toLocaleString("fa-IR"));
+      Alert.alert("همگام‌سازی انجام شد", "انبار، لیست خرید، برنامه هفتگی و ترجیحات بین دستگاه و فضای ابری همگام شدند.");
+    } catch (error: any) {
+      setCloudSyncMessage("همگام‌سازی ناموفق بود");
+      Alert.alert("خطای همگام‌سازی", error?.message ?? "دریافت یا ارسال اطلاعات ناموفق بود.");
+    } finally {
+      setCloudSyncBusy(false);
+    }
+  };
+
   const signOutCloud = async () => {
     if (!supabase) return;
     const { error } = await supabase.auth.signOut();
@@ -437,12 +470,14 @@ function AppContent() {
       <Header title="تنظیمات" subtitle="ترجیحات روی همین دستگاه ذخیره می‌شوند" />
       <View style={styles.profile}><Ionicons name="person-circle-outline" size={42} color={C.gold}/><View style={{flex:1}}><Text style={styles.listTitle}>{cloudUserEmail ? "حساب متصل" : "حساب مهمان"}</Text><Text style={styles.muted}>{cloudUserEmail ?? "اطلاعات فعلاً فقط روی همین دستگاه ذخیره می‌شوند."}</Text></View></View>
       <SectionTitle title="حساب ابری و پشتیبان‌گیری"/>
+      <View style={styles.profile}><Ionicons name="cloud-done-outline" size={24} color={C.green2}/><View style={{flex:1}}><Text style={styles.listTitle}>{cloudSyncMessage}</Text><Text style={styles.muted}>آخرین وضعیت همگام‌سازی این دستگاه</Text></View></View>
+      <Pressable disabled={!cloudUserEmail || cloudSyncBusy} style={[styles.greenButton, (!cloudUserEmail || cloudSyncBusy) && {opacity:0.45}]} onPress={syncCloudNow}><Ionicons name="sync-outline" color={C.white} size={18}/><Text style={styles.greenButtonText}>{cloudSyncBusy ? "در حال همگام‌سازی..." : "همگام‌سازی اکنون"}</Text></Pressable>
       {!supabaseConfigured ? <View style={styles.tip}><Ionicons name="cloud-offline-outline" color={C.gold} size={20}/><Text style={styles.tipText}>اتصال ابری هنوز پیکربندی نشده؛ متغیرهای EXPO_PUBLIC_SUPABASE_URL و EXPO_PUBLIC_SUPABASE_ANON_KEY لازم‌اند.</Text></View> : null}
       {cloudUserEmail ? <Pressable style={styles.settingRow} onPress={signOutCloud}><Ionicons name="log-out-outline" size={20} color={C.gold}/><Text style={styles.listTitle}>خروج از حساب ابری</Text></Pressable> : <>
         <TextInput value={cloudEmail} onChangeText={setCloudEmail} autoCapitalize="none" keyboardType="email-address" placeholder="ایمیل برای ورود" placeholderTextColor={C.muted} style={styles.input}/>
         {cloudCodeSent ? <><TextInput value={cloudCode} onChangeText={setCloudCode} keyboardType="number-pad" maxLength={6} placeholder="کد شش‌رقمی ایمیل" placeholderTextColor={C.muted} style={styles.input}/><Pressable disabled={cloudBusy} style={[styles.greenButton, cloudBusy && {opacity:0.5}]} onPress={verifyCloudCode}><Text style={styles.greenButtonText}>{cloudBusy ? "در حال بررسی..." : "تأیید کد و ورود"}</Text></Pressable></> : <Pressable disabled={cloudBusy || !supabaseConfigured} style={[styles.greenButton, (!supabaseConfigured || cloudBusy) && {opacity:0.5}]} onPress={requestCloudCode}><Text style={styles.greenButtonText}>{cloudBusy ? "در حال ارسال..." : "ارسال کد ورود به ایمیل"}</Text></Pressable>}
       </>}
-      <View style={styles.tip}><Ionicons name="shield-checkmark-outline" color={C.gold} size={20}/><Text style={styles.tipText}>نشست ورود با SecureStore دستگاه نگهداری می‌شود. کلید Service Role هرگز نباید در برنامه موبایل قرار بگیرد. انتقال و همگام‌سازی داده‌ها در مرحله بعد فعال می‌شود.</Text></View>
+      <View style={styles.tip}><Ionicons name="shield-checkmark-outline" color={C.gold} size={20}/><Text style={styles.tipText}>نشست ورود با SecureStore نگهداری می‌شود. همگام‌سازی انبار، خرید، برنامه هفتگی و ترجیحات با سیاست‌های RLS انجام می‌شود. کلید Service Role هرگز نباید در برنامه موبایل قرار بگیرد.</Text></View>
       <SectionTitle title="الگوی غذایی"/>
       <Text style={styles.muted}>غذاهای پیشنهادی براساس این انتخاب فیلتر می‌شوند.</Text>
       <View style={styles.filterRow}>{["همه", "گیاهی"].map(option => <Pressable key={option} onPress={() => savePreferences({...preferences, diet: option})} style={[styles.chip, preferences.diet === option && styles.chipActive]}><Text style={[styles.chipText, preferences.diet === option && styles.chipTextActive]}>{option}</Text></Pressable>)}</View>

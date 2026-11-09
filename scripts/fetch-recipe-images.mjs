@@ -18,6 +18,7 @@ const clean = value => String(value ?? "").replace(/<[^>]*>/g, " ").replace(/&am
 const wait = ms => new Promise(resolve => setTimeout(resolve, ms));
 const entries = [];
 const attribution = [];
+const usedFileTitles = new Set();
 
 for (const recipe of recipes) {
   const terms = recipe.id.replace(/-/g, " ");
@@ -39,7 +40,7 @@ for (const recipe of recipes) {
     for (const page of pages) {
       const info = page.imageinfo?.[0];
       const meta = info?.extmetadata ?? {};
-      if (!info?.thumburl || !allowedLicense(meta.LicenseShortName?.value)) continue;
+      if (!info?.thumburl || usedFileTitles.has(page.title) || !allowedLicense(meta.LicenseShortName?.value)) continue;
       chosen = { page, info, meta };
       break;
     }
@@ -49,6 +50,7 @@ for (const recipe of recipes) {
       continue;
     }
 
+    usedFileTitles.add(chosen.page.title);
     const imageResponse = await fetch(chosen.info.thumburl, {
       headers: { "User-Agent": "ChiBepazam/1.0 (recipe photo catalog; open-source app)" }
     });

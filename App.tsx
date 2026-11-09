@@ -250,7 +250,40 @@ function AppContent() {
       <Header title="لیست خرید" subtitle="چیزهایی که باید تهیه کنی" />
       <View style={styles.summary}><Text style={styles.summaryNumber}>{shopping.filter(x => !x.checked).length}</Text><Text style={styles.summaryText}>مورد برای خرید باقی مانده</Text></View>
       {shopping.map(item => <Pressable key={item.id} onPress={() => toggleShopping(item)} style={styles.listRow}><Ionicons name={item.checked ? "checkbox" : "square-outline"} size={22} color={item.checked ? C.green2 : C.muted}/><View style={styles.listMain}><Text style={[styles.listTitle, !!item.checked && styles.checkedText]}>{item.ingredient_name}</Text><Text style={styles.muted}>{item.quantity} {item.unit}</Text></View></Pressable>)}
-      {shopping.some(item => item.checked) ? <Pressable style={styles.greenButton} onPress={async () => { const bought = shopping.filter(item => item.checked); for (const item of bought) { await db.runAsync("INSERT INTO pantry (ingredient_name, quantity, unit, updated_at, deleted) VALUES (?, ?, ?, CURRENT_TIMESTAMP, 0) ON CONFLICT(ingredient_name) DO UPDATE SET quantity = quantity + excluded.quantity, unit = excluded.unit, updated_at = CURRENT_TIMESTAMP, deleted = 0", item.ingredient_name, item.quantity, item.unit); } await db.runAsync("DELETE FROM shopping_items WHERE checked = 1"); await loadData(); Alert.alert("انبار به‌روز شد", "اقلام خریداری‌شده به انبار خانه منتقل شدند."); }}><Ionicons name="checkmark-done" color={C.white} size={18}/><Text style={styles.greenButtonText}>انتقال خریدها به انبار ({shopping.filter(item => item.checked).length})</Text></Pressable> : null}
+      {shopping.some(item => item.checked) ? <Pressable style={styles.greenButton} onPress={async () => {
+        const bought = shopping.filter(item => item.checked);
+        const transferred: number[] = [];
+        const unitMismatches: string[] = [];
+        for (const item of bought) {
+          const existing = await db.getFirstAsync<{ id: number; quantity: number; unit: string }>(
+            "SELECT id, quantity, unit FROM pantry WHERE ingredient_name = ? AND deleted = 0",
+            item.ingredient_name
+          );
+          if (existing && existing.unit !== item.unit) {
+            unitMismatches.push(item.ingredient_name);
+            continue;
+          }
+          if (existing) {
+            await db.runAsync(
+              "UPDATE pantry SET quantity = quantity + ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?",
+              item.quantity, existing.id
+            );
+          } else {
+            await db.runAsync(
+              "INSERT INTO pantry (ingredient_name, quantity, unit, updated_at, deleted) VALUES (?, ?, ?, CURRENT_TIMESTAMP, 0)",
+              item.ingredient_name, item.quantity, item.unit
+            );
+          }
+          transferred.push(item.id);
+        }
+        for (const id of transferred) await db.runAsync("DELETE FROM shopping_items WHERE id = ?", id);
+        await loadData();
+        if (unitMismatches.length) {
+          Alert.alert("بعضی مواد منتقل نشدند", "واحد این مواد با واحد ثبت‌شده در انبار متفاوت است؛ برای جلوگیری از جمع‌زدن مقدارهای ناسازگار، آن‌ها در لیست خرید باقی ماندند: " + unitMismatches.join("، "));
+        } else {
+          Alert.alert("انبار به‌روز شد", "اقلام خریداری‌شده به انبار خانه منتقل شدند.");
+        }
+      }}><Ionicons name="checkmark-done" color={C.white} size={18}/><Text style={styles.greenButtonText}>انتقال خریدها به انبار ({shopping.filter(item => item.checked).length})</Text></Pressable> : null}
       {shopping.length === 0 ? <View style={styles.empty}><Text style={styles.emptyEmoji}>🛒</Text><Text style={styles.emptyTitle}>لیست خرید خالی است</Text><Text style={styles.muted}>از جزئیات دستور پخت، مواد لازم را اضافه کن.</Text></View> : null}
       <Pressable style={styles.outlineButton} onPress={() => Alert.alert("راهنما", "برای افزودن مواد، وارد پیشنهاد غذا شو و یک دستور را باز کن.")}><Text style={styles.outlineButtonText}>چطور لیست خرید بسازم؟</Text></Pressable>
     </ScrollView>

@@ -32,6 +32,7 @@ function AppContent() {
   const [newName, setNewName] = useState("");
   const [newQty, setNewQty] = useState("1");
   const [selected, setSelected] = useState<Recipe | null>(null);
+  const [planPickerDate, setPlanPickerDate] = useState<string | null>(null);
   const [pantryFilter, setPantryFilter] = useState("همه");
   const [recipeFilter, setRecipeFilter] = useState("همه");
 
@@ -188,17 +189,13 @@ function AppContent() {
     return { iso, label: names[date.getDay()], dayNumber: date.getDate() };
   });
 
-  const chooseMealForDay = (date: string) => {
-    Alert.alert("انتخاب غذا", "برای این روز چه غذایی ثبت شود؟", [
-      ...recipes.map(recipe => ({
-        text: recipe.title,
-        onPress: async () => {
-          await db.runAsync("INSERT INTO meal_plan (meal_date, meal_type, recipe_id) VALUES (?, ?, ?)", date, "شام", recipe.id);
-          await loadData();
-        }
-      })),
-      { text: "انصراف", style: "cancel" }
-    ]);
+  const chooseMealForDay = (date: string) => setPlanPickerDate(date);
+
+  const addMealToSelectedDay = async (recipe: Recipe) => {
+    if (!planPickerDate) return;
+    await db.runAsync("INSERT INTO meal_plan (meal_date, meal_type, recipe_id) VALUES (?, ?, ?)", planPickerDate, "شام", recipe.id);
+    setPlanPickerDate(null);
+    await loadData();
   };
 
   const removeMeal = async (id: number) => {
@@ -280,6 +277,23 @@ function AppContent() {
         ) : tab === "خانه" ? <Home/> : tab === "انبار" ? <Pantry/> : tab === "پیشنهادها" ? <Suggestions/> : tab === "لیست خرید" ? <Shopping/> : tab === "برنامه" ? <Plan/> : <Settings/>}
       </View>
       <View style={styles.tabBar}>{tabs.map(t => <Pressable key={t.name} onPress={() => { setSelected(null); setTab(t.name); }} style={styles.tabItem}><Ionicons name={t.icon as keyof typeof Ionicons.glyphMap} size={21} color={tab === t.name ? C.gold : C.muted}/><Text style={[styles.tabLabel, tab === t.name && styles.tabLabelActive]}>{t.name}</Text></Pressable>)}</View>
+      <Modal visible={!!planPickerDate} transparent animationType="slide" onRequestClose={() => setPlanPickerDate(null)}>
+        <View style={styles.modalShade}>
+          <View style={[styles.modalCard, { maxHeight: "82%" }]}>
+            <Text style={styles.modalTitle}>انتخاب غذا برای برنامه</Text>
+            <ScrollView>
+              {recipes.map(recipe => (
+                <Pressable key={recipe.id} style={styles.recipeCard} onPress={() => addMealToSelectedDay(recipe)}>
+                  <View style={styles.foodThumb}><Text style={styles.foodEmoji}>{recipe.image}</Text></View>
+                  <View style={styles.recipeInfo}><Text style={styles.recipeTitle}>{recipe.title}</Text><Text style={styles.muted}>{recipe.timeMin} دقیقه</Text></View>
+                  <Ionicons name="add-circle" color={C.green2} size={22}/>
+                </Pressable>
+              ))}
+            </ScrollView>
+            <Pressable style={styles.cancelButton} onPress={() => setPlanPickerDate(null)}><Text style={styles.cancelText}>بستن</Text></Pressable>
+          </View>
+        </View>
+      </Modal>
       <Modal visible={modal} transparent animationType="fade" onRequestClose={() => setModal(false)}>
         <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : undefined} style={styles.modalShade}>
           <View style={styles.modalCard}><Text style={styles.modalTitle}>افزودن به انبار</Text>

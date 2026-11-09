@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from "react";
 import {
-  Alert, FlatList, KeyboardAvoidingView, Modal, Platform, Pressable,
+  Alert, FlatList, Image, KeyboardAvoidingView, Modal, Platform, Pressable,
   ScrollView, StatusBar, StyleSheet, Text, TextInput, View
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
@@ -23,6 +23,14 @@ const C = {
   goldSoft: "#A9822D", green: "#168A3B", green2: "#20A64C", text: "#F7F2E8",
   muted: "#A9A69D", line: "#302F28", white: "#FFFFFF", red: "#D66B55"
 };
+
+function FoodArt({ recipe, large = false }: { recipe: Recipe; large?: boolean }) {
+  const [failed, setFailed] = useState(false);
+  if (recipe.imageUrl && !failed) {
+    return <Image source={{ uri: recipe.imageUrl }} resizeMode="cover" onError={() => setFailed(true)} style={large ? styles.foodArtLarge : styles.foodArtThumb}/>;
+  }
+  return <Text style={large ? styles.detailEmoji : styles.foodEmoji}>{recipe.image}</Text>;
+}
 
 function AppContent() {
   const db = useSQLiteContext();
@@ -165,7 +173,7 @@ function AppContent() {
 
   const RecipeCard = ({ recipe, compact = false }: { recipe: Recipe; compact?: boolean }) => (
     <Pressable style={[styles.recipeCard, compact && styles.recipeCompact]} onPress={() => setSelected(recipe)}>
-      <View style={styles.foodThumb}><Text style={styles.foodEmoji}>{recipe.image}</Text><View style={styles.rating}><Ionicons name="star" size={11} color={C.gold}/><Text style={styles.ratingText}>{recipe.rating}</Text></View></View>
+      <View style={styles.foodThumb}><FoodArt recipe={recipe}/><View style={styles.rating}><Ionicons name="star" size={11} color={C.gold}/><Text style={styles.ratingText}>{recipe.rating}</Text></View></View>
       <View style={styles.recipeInfo}>
         <Text style={styles.recipeTitle}>{recipe.title}</Text>
         <Text style={styles.muted}>{recipe.subtitle}</Text>
@@ -353,7 +361,7 @@ function AppContent() {
         {selected ? (
           <ScrollView contentContainerStyle={styles.page}>
             <Pressable onPress={() => setSelected(null)} style={styles.back}><Ionicons name="arrow-forward" size={21} color={C.text}/><Text style={styles.backText}>بازگشت</Text></Pressable>
-            <View style={styles.detailHero}><Text style={styles.detailEmoji}>{selected.image}</Text></View>
+            <View style={styles.detailHero}><FoodArt recipe={selected} large/></View>
             <Text style={styles.detailTitle}>{selected.title}</Text><Text style={styles.muted}>{selected.subtitle}</Text>
             <View style={styles.metaPanel}><Text style={styles.metaText}>⏱ {selected.timeMin} دقیقه</Text><Text style={styles.metaText}>🔥 {selected.calories} کالری</Text><Text style={styles.metaText}>⭐ {selected.rating}</Text></View>
             <SectionTitle title="مواد لازم"/>
@@ -372,7 +380,7 @@ function AppContent() {
             <ScrollView>
               {recipes.map(recipe => (
                 <Pressable key={recipe.id} style={styles.recipeCard} onPress={() => addMealToSelectedDay(recipe)}>
-                  <View style={styles.foodThumb}><Text style={styles.foodEmoji}>{recipe.image}</Text></View>
+                  <View style={styles.foodThumb}><FoodArt recipe={recipe}/></View>
                   <View style={styles.recipeInfo}><Text style={styles.recipeTitle}>{recipe.title}</Text><Text style={styles.muted}>{recipe.timeMin} دقیقه</Text></View>
                   <Ionicons name="add-circle" color={C.green2} size={22}/>
                 </Pressable>
@@ -478,7 +486,9 @@ const styles = StyleSheet.create({
   settingRow: { flexDirection: "row-reverse", alignItems: "center", gap: 13, padding: 15, backgroundColor: C.panel, borderRadius: 13 },
   back: { flexDirection: "row-reverse", alignItems: "center", gap: 8 },
   backText: { color: C.text, fontWeight: "700" },
-  detailHero: { height: 190, borderRadius: 22, backgroundColor: "#292318", alignItems: "center", justifyContent: "center" },
+  detailHero: { height: 190, borderRadius: 22, backgroundColor: "#292318", alignItems: "center", justifyContent: "center", overflow: "hidden" },
+  foodArtThumb: { width: "100%", height: "100%", borderRadius: 13 },
+  foodArtLarge: { width: "100%", height: "100%", borderRadius: 22 },
   detailEmoji: { fontSize: 100 },
   detailTitle: { color: C.text, fontSize: 23, fontWeight: "900", textAlign: "right" },
   metaPanel: { flexDirection: "row-reverse", justifyContent: "space-around", backgroundColor: C.panel, padding: 15, borderRadius: 14 },

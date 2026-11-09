@@ -19,15 +19,15 @@ const invalidSteps = stepBlocks.filter(match => {
 });
 
 const errors = [];
-if (ids.length !== 150) errors.push(\`Expected exactly 150 recipes, found \${ids.length}\`);
-if (duplicateIds.length) errors.push(\`Duplicate recipe IDs: \${[...new Set(duplicateIds)].join(", ")}\`);
-if (missingIngredients.length) errors.push(\`Missing pantry ingredient seeds: \${missingIngredients.join(", ")}\`);
-if (stepBlocks.length !== ids.length) errors.push(\`Expected steps for every recipe; found \${stepBlocks.length} step blocks for \${ids.length} recipes\`);
-if (invalidSteps.length) errors.push(\`\${invalidSteps.length} recipes have invalid or too-short instructions\`);
+if (ids.length !== 150) errors.push(`Expected exactly 150 recipes, found ${ids.length}`);
+if (duplicateIds.length) errors.push(`Duplicate recipe IDs: ${[...new Set(duplicateIds)].join(", ")}`);
+if (missingIngredients.length) errors.push(`Missing pantry ingredient seeds: ${missingIngredients.join(", ")}`);
+if (stepBlocks.length !== ids.length) errors.push(`Expected steps for every recipe; found ${stepBlocks.length} step blocks for ${ids.length} recipes`);
+if (invalidSteps.length) errors.push(`${invalidSteps.length} recipes have invalid or too-short instructions`);
 
 if (errors.length) {
   console.error(errors.join("\n"));
   process.exit(1);
 }
 
-console.log(\`Catalog validation passed: \${ids.length} unique recipes, all ingredients seeded, and usable step lists.\`);
+console.log(`Catalog validation passed: ${ids.length} unique recipes, all ingredients seeded, and usable step lists.`);

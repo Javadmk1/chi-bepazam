@@ -18,7 +18,7 @@ create table if not exists public.pantry_items (
   ingredient_name text not null check (length(trim(ingredient_name)) between 1 and 120),
   quantity numeric(12,3) not null default 1 check (quantity >= 0),
   unit text not null check (length(trim(unit)) between 1 and 24),
-  expires_at date,
+  expires_at text,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now(),
   deleted_at timestamptz,

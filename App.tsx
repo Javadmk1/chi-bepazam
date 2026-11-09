@@ -104,7 +104,7 @@ function AppContent() {
     const normalized = normalizeIngredient(name);
     const seed = ingredientSeeds.find(x => x.name === normalized);
     await db.runAsync(
-      "INSERT INTO pantry (ingredient_name, quantity, unit, expires_at, updated_at, deleted) VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP, 0) ON CONFLICT(ingredient_name) DO UPDATE SET quantity = quantity + excluded.quantity, expires_at = COALESCE(excluded.expires_at, pantry.expires_at), updated_at = CURRENT_TIMESTAMP, deleted = 0",
+      "INSERT INTO pantry (ingredient_name, quantity, unit, expires_at, updated_at, deleted) VALUES (?, ?, ?, ?, strftime('%Y-%m-%dT%H:%M:%fZ','now'), 0) ON CONFLICT(ingredient_name) DO UPDATE SET quantity = quantity + excluded.quantity, expires_at = COALESCE(excluded.expires_at, pantry.expires_at), updated_at = strftime('%Y-%m-%dT%H:%M:%fZ','now'), deleted = 0",
       normalized, Math.max(0.01, qty), seed?.unit ?? "عدد", expiresAt
     );
     await loadData();
@@ -115,7 +115,7 @@ function AppContent() {
     const seed = ingredientSeeds.find(entry => entry.name === normalized);
     try {
       await db.runAsync(
-        "UPDATE pantry SET ingredient_name = ?, quantity = ?, unit = ?, expires_at = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?",
+        "UPDATE pantry SET ingredient_name = ?, quantity = ?, unit = ?, expires_at = ?, updated_at = strftime('%Y-%m-%dT%H:%M:%fZ','now') WHERE id = ?",
         normalized, quantity, seed?.unit ?? item.unit, expiresAt, item.id
       );
       await loadData();
@@ -135,7 +135,7 @@ function AppContent() {
   const adjustPantry = async (item: PantryItem, direction: -1 | 1) => {
     const step = item.unit === "گرم" || item.unit === "میلی‌لیتر" ? 50 : 1;
     await db.runAsync(
-      "UPDATE pantry SET quantity = MAX(0, quantity + ?), updated_at = CURRENT_TIMESTAMP WHERE id = ?",
+      "UPDATE pantry SET quantity = MAX(0, quantity + ?), updated_at = strftime('%Y-%m-%dT%H:%M:%fZ','now') WHERE id = ?",
       direction * step, item.id
     );
     await loadData();
@@ -145,22 +145,22 @@ function AppContent() {
   const expiredItems = pantry.filter(item => getExpiryStatus(item.expires_at) === "expired");
 
   const addShopping = async (name: string, qty = 1, unit = "عدد") => {
-    await db.runAsync("INSERT INTO shopping_items (ingredient_name, quantity, unit, updated_at, deleted) VALUES (?, ?, ?, CURRENT_TIMESTAMP, 0) ON CONFLICT(ingredient_name) DO UPDATE SET quantity = quantity + excluded.quantity, checked = 0, deleted = 0, updated_at = CURRENT_TIMESTAMP", normalizeIngredient(name), qty, unit);
+    await db.runAsync("INSERT INTO shopping_items (ingredient_name, quantity, unit, updated_at, deleted) VALUES (?, ?, ?, strftime('%Y-%m-%dT%H:%M:%fZ','now'), 0) ON CONFLICT(ingredient_name) DO UPDATE SET quantity = quantity + excluded.quantity, checked = 0, deleted = 0, updated_at = strftime('%Y-%m-%dT%H:%M:%fZ','now')", normalizeIngredient(name), qty, unit);
     await loadData();
   };
 
   const toggleShopping = async (item: ShoppingItem) => {
-    await db.runAsync("UPDATE shopping_items SET checked = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?", item.checked ? 0 : 1, item.id);
+    await db.runAsync("UPDATE shopping_items SET checked = ?, updated_at = strftime('%Y-%m-%dT%H:%M:%fZ','now') WHERE id = ?", item.checked ? 0 : 1, item.id);
     await loadData();
   };
 
   const removeShopping = async (item: ShoppingItem) => {
-    await db.runAsync("UPDATE shopping_items SET deleted = 1, updated_at = CURRENT_TIMESTAMP WHERE id = ?", item.id);
+    await db.runAsync("UPDATE shopping_items SET deleted = 1, updated_at = strftime('%Y-%m-%dT%H:%M:%fZ','now') WHERE id = ?", item.id);
     await loadData();
   };
 
   const removePantry = async (item: PantryItem) => {
-    await db.runAsync("UPDATE pantry SET deleted = 1, updated_at = CURRENT_TIMESTAMP WHERE id = ?", item.id);
+    await db.runAsync("UPDATE pantry SET deleted = 1, updated_at = strftime('%Y-%m-%dT%H:%M:%fZ','now') WHERE id = ?", item.id);
     await loadData();
   };
 
@@ -188,7 +188,7 @@ function AppContent() {
       const need = missingRecipeQuantity(item.qty, owned?.quantity ?? 0, owned?.unit ?? "", preferences.household_size, 2);
       if (need) {
         await db.runAsync(
-          "INSERT INTO shopping_items (ingredient_name, quantity, unit, updated_at, deleted) VALUES (?, ?, ?, CURRENT_TIMESTAMP, 0) ON CONFLICT(ingredient_name) DO UPDATE SET quantity = quantity + excluded.quantity, unit = excluded.unit, checked = 0, deleted = 0, updated_at = CURRENT_TIMESTAMP",
+          "INSERT INTO shopping_items (ingredient_name, quantity, unit, updated_at, deleted) VALUES (?, ?, ?, strftime('%Y-%m-%dT%H:%M:%fZ','now'), 0) ON CONFLICT(ingredient_name) DO UPDATE SET quantity = quantity + excluded.quantity, unit = excluded.unit, checked = 0, deleted = 0, updated_at = strftime('%Y-%m-%dT%H:%M:%fZ','now')",
           normalized, need.quantity, need.unit
         );
       }
@@ -310,18 +310,18 @@ function AppContent() {
           }
           if (existing) {
             await db.runAsync(
-              "UPDATE pantry SET quantity = quantity + ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?",
+              "UPDATE pantry SET quantity = quantity + ?, updated_at = strftime('%Y-%m-%dT%H:%M:%fZ','now') WHERE id = ?",
               item.quantity, existing.id
             );
           } else {
             await db.runAsync(
-              "INSERT INTO pantry (ingredient_name, quantity, unit, updated_at, deleted) VALUES (?, ?, ?, CURRENT_TIMESTAMP, 0)",
+              "INSERT INTO pantry (ingredient_name, quantity, unit, updated_at, deleted) VALUES (?, ?, ?, strftime('%Y-%m-%dT%H:%M:%fZ','now'), 0)",
               item.ingredient_name, item.quantity, item.unit
             );
           }
           transferred.push(item.id);
         }
-        for (const id of transferred) await db.runAsync("UPDATE shopping_items SET deleted = 1, updated_at = CURRENT_TIMESTAMP WHERE id = ?", id);
+        for (const id of transferred) await db.runAsync("UPDATE shopping_items SET deleted = 1, updated_at = strftime('%Y-%m-%dT%H:%M:%fZ','now') WHERE id = ?", id);
         await loadData();
         if (unitMismatches.length) {
           Alert.alert("بعضی مواد منتقل نشدند", "واحد این مواد با واحد ثبت‌شده در انبار متفاوت است؛ برای جلوگیری از جمع‌زدن مقدارهای ناسازگار، آن‌ها در لیست خرید باقی ماندند: " + unitMismatches.join("، "));
@@ -346,13 +346,13 @@ function AppContent() {
 
   const addMealToSelectedDay = async (recipe: Recipe) => {
     if (!planPickerDate) return;
-    await db.runAsync("INSERT INTO meal_plan (meal_date, meal_type, recipe_id, updated_at, deleted) VALUES (?, ?, ?, CURRENT_TIMESTAMP, 0) ON CONFLICT(meal_date, meal_type, recipe_id) DO UPDATE SET deleted = 0, updated_at = CURRENT_TIMESTAMP", planPickerDate, "شام", recipe.id);
+    await db.runAsync("INSERT INTO meal_plan (meal_date, meal_type, recipe_id, updated_at, deleted) VALUES (?, ?, ?, strftime('%Y-%m-%dT%H:%M:%fZ','now'), 0) ON CONFLICT(meal_date, meal_type, recipe_id) DO UPDATE SET deleted = 0, updated_at = strftime('%Y-%m-%dT%H:%M:%fZ','now')", planPickerDate, "شام", recipe.id);
     setPlanPickerDate(null);
     await loadData();
   };
 
   const removeMeal = async (id: number) => {
-    await db.runAsync("UPDATE meal_plan SET deleted = 1, updated_at = CURRENT_TIMESTAMP WHERE id = ?", id);
+    await db.runAsync("UPDATE meal_plan SET deleted = 1, updated_at = strftime('%Y-%m-%dT%H:%M:%fZ','now') WHERE id = ?", id);
     await loadData();
   };
 
@@ -398,7 +398,7 @@ function AppContent() {
           const available = stock?.unit === need.unit ? stock.quantity : 0;
           const missing = Math.max(0, Math.round((need.quantity - available) * 100) / 100);
           if (missing > 0) await db.runAsync(
-            "INSERT INTO shopping_items (ingredient_name, quantity, unit, updated_at, deleted) VALUES (?, ?, ?, CURRENT_TIMESTAMP, 0) ON CONFLICT(ingredient_name) WHERE checked = 0 DO UPDATE SET quantity = quantity + excluded.quantity, unit = excluded.unit, updated_at = CURRENT_TIMESTAMP",
+            "INSERT INTO shopping_items (ingredient_name, quantity, unit, updated_at, deleted) VALUES (?, ?, ?, strftime('%Y-%m-%dT%H:%M:%fZ','now'), 0) ON CONFLICT(ingredient_name) WHERE checked = 0 DO UPDATE SET quantity = quantity + excluded.quantity, unit = excluded.unit, updated_at = strftime('%Y-%m-%dT%H:%M:%fZ','now')",
             name, missing, need.unit
           );
         }
@@ -410,7 +410,7 @@ function AppContent() {
   );
 
   const savePreferences = async (next: UserPreferences) => {
-    await db.runAsync("UPDATE user_preferences SET diet = ?, allergies_json = ?, household_size = ?, weekly_budget = ?, updated_at = CURRENT_TIMESTAMP WHERE id = 1", next.diet, next.allergies_json, next.household_size, next.weekly_budget);
+    await db.runAsync("UPDATE user_preferences SET diet = ?, allergies_json = ?, household_size = ?, weekly_budget = ?, updated_at = strftime('%Y-%m-%dT%H:%M:%fZ','now') WHERE id = 1", next.diet, next.allergies_json, next.household_size, next.weekly_budget);
     setPreferences(next);
     await loadData();
   };

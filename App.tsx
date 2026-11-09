@@ -11,7 +11,8 @@ import { recipes, type Recipe } from "./src/data/recipes";
 import { ingredientSeeds, normalizeIngredient } from "./src/data/ingredients";
 import { rankRecipes } from "./src/engine/matcher";
 
-type PantryItem = { id: number; ingredient_name: string; quantity: number; unit: string };
+type PantryItem = { id: number; ingredient_name: string; quantity: number; unit: string; expires_at?: string | null };
+type UserPreferences = { diet: string; allergies_json: string; household_size: number; weekly_budget: number };
 type ShoppingItem = { id: number; ingredient_name: string; quantity: number; unit: string; checked: number };
 type PlanItem = { id: number; meal_date: string; meal_type: string; recipe_id: string };
 
@@ -35,14 +36,18 @@ function AppContent() {
   const [planPickerDate, setPlanPickerDate] = useState<string | null>(null);
   const [pantryFilter, setPantryFilter] = useState("همه");
   const [recipeFilter, setRecipeFilter] = useState("همه");
+  const [preferences, setPreferences] = useState<UserPreferences>({ diet: "همه", allergies_json: "[]", household_size: 2, weekly_budget: 0 });
+  const [allergyInput, setAllergyInput] = useState("");
 
   const loadData = async () => {
     const p = await db.getAllAsync<PantryItem>("SELECT id, ingredient_name, quantity, unit FROM pantry WHERE deleted = 0 ORDER BY ingredient_name");
     const s = await db.getAllAsync<ShoppingItem>("SELECT id, ingredient_name, quantity, unit, checked FROM shopping_items ORDER BY checked, ingredient_name");
     const plan = await db.getAllAsync<PlanItem>("SELECT id, meal_date, meal_type, recipe_id FROM meal_plan ORDER BY meal_date");
+    const prefs = await db.getFirstAsync<UserPreferences>("SELECT diet, allergies_json, household_size, weekly_budget FROM user_preferences WHERE id = 1");
     setPantry(p);
     setShopping(s);
     setMealPlan(plan);
+    if (prefs) { setPreferences(prefs); try { setAllergyInput((JSON.parse(prefs.allergies_json) as string[]).join(", ")); } catch { setAllergyInput(""); } }
   };
 
   useEffect(() => { loadData().catch(() => Alert.alert("خطا", "خواندن اطلاعات محلی انجام نشد.")); }, []);
@@ -73,7 +78,13 @@ function AppContent() {
   };
 
   const matchingRecipes = useMemo(() => {
-    return rankRecipes(recipes, pantry)
+    const allergies = (() => { try { return (JSON.parse(preferences.allergies_json) as string[]).map(normalizeIngredient); } catch { return []; } })();
+    return rankRecipes(recipes.filter(r => {
+      const ingredientNames = r.ingredients.map(item => normalizeIngredient(item.name));
+      const allergyBlocked = allergies.some(allergen => ingredientNames.includes(allergen));
+      const dietBlocked = preferences.diet === "گیاهی" && !r.tags.includes("گیاهی");
+      return !allergyBlocked && !dietBlocked;
+    }), pantry)
       .filter(({ recipe: r }) => {
         const q = query.trim();
         const textMatch = !q || r.title.includes(q) || r.tags.some(t => t.includes(q));
@@ -81,7 +92,7 @@ function AppContent() {
         return textMatch && filterMatch;
       })
       .map(match => match.recipe);
-  }, [query, recipeFilter, pantry]);
+  }, [query, recipeFilter, pantry, preferences]);
 
   const addRecipeToShopping = async (recipe: Recipe) => {
     for (const item of recipe.ingredients) {
@@ -241,11 +252,35 @@ function AppContent() {
     </ScrollView>
   );
 
+  const savePreferences = async (next: UserPreferences) => {
+    await db.runAsync("UPDATE user_preferences SET diet = ?, allergies_json = ?, household_size = ?, weekly_budget = ? WHERE id = 1", next.diet, next.allergies_json, next.household_size, next.weekly_budget);
+    setPreferences(next);
+  };
+
   const Settings = () => (
     <ScrollView contentContainerStyle={styles.page}>
-      <Header title="تنظیمات" subtitle="شخصی‌سازی تجربه آشپزی" />
-      <View style={styles.profile}><Ionicons name="person-circle-outline" size={54} color={C.gold}/><View><Text style={styles.listTitle}>حساب مهمان</Text><Text style={styles.muted}>اطلاعات فعلاً فقط روی همین دستگاه ذخیره می‌شود.</Text></View></View>
-      {["ترجیحات غذایی", "حساسیت‌های غذایی", "تعداد اعضای خانواده", "بودجه هفتگی", "پشتیبان‌گیری و همگام‌سازی", "درباره چی بپزم؟"].map((x, i) => <Pressable key={x} style={styles.settingRow} onPress={() => Alert.alert(x, "این بخش در گام بعدی توسعه تکمیل می‌شود.")}><Ionicons name={["leaf-outline", "alert-circle-outline", "people-outline", "wallet-outline", "sync-outline", "information-circle-outline"][i] as keyof typeof Ionicons.glyphMap} size={20} color={C.gold}/><Text style={styles.listTitle}>{x}</Text><Ionicons name="chevron-back" size={17} color={C.muted}/></Pressable>)}
+      <Header title="تنظیمات" subtitle="ترجیحات روی همین دستگاه ذخیره می‌شوند" />
+      <View style={styles.profile}><Ionicons name="person-circle-outline" size={48} color={C.gold}/><View style={{flex:1}}><Text style={styles.listTitle}>حساب مهمان</Text><Text style={styles.muted}>بدون نیاز به ثبت‌نام</Text></View></View>
+      <SectionTitle title="الگوی غذایی"/>
+      <Text style={styles.muted}>غذاهای پیشنهادی براساس این انتخاب فیلتر می‌شوند.</Text>
+      <View style={styles.filterRow}>{["همه", "گیاهی"].map(option => <Pressable key={option} onPress={() => savePreferences({...preferences, diet: option})} style={[styles.chip, preferences.diet === option && styles.chipActive]}><Text style={[styles.chipText, preferences.diet === option && styles.chipTextActive]}>{option}</Text></Pressable>)}</View>
+      <SectionTitle title="حساسیت‌ها و مواد ممنوع"/>
+      <Text style={styles.muted}>نام مواد را با ویرگول جدا کن؛ غذاهایی که ماده‌ای با نام منطبق دارند از پیشنهادها حذف می‌شوند.</Text>
+      <TextInput value={allergyInput} onChangeText={setAllergyInput} placeholder="مثلاً شیر، بادام‌زمینی، تخم‌مرغ" placeholderTextColor={C.muted} style={styles.input}/>
+      <Pressable style={styles.greenButton} onPress={() => {
+        const values = [...new Set(allergyInput.split(/[,،]/).map(x => normalizeIngredient(x.trim())).filter(Boolean))];
+        savePreferences({...preferences, allergies_json: JSON.stringify(values)}).then(() => Alert.alert("ذخیره شد", "فیلتر مواد انتخاب‌شده در پیشنهاد غذا اعمال شد."));
+      }}><Text style={styles.greenButtonText}>ذخیره حساسیت‌ها</Text></Pressable>
+      <SectionTitle title="تعداد نفرات"/>
+      <Text style={styles.muted}>تعداد نفرات ذخیره می‌شود؛ محاسبه خودکار مقادیر تا استانداردسازی واحدهای دستورها فعال نشده است.</Text>
+      <View style={[styles.filterRow, {alignItems:"center"}]}>
+        <Pressable style={styles.chip} onPress={() => savePreferences({...preferences, household_size: Math.max(1, preferences.household_size - 1)})}><Text style={styles.chipText}>−</Text></Pressable>
+        <Text style={styles.listTitle}>{preferences.household_size} نفر</Text>
+        <Pressable style={styles.chip} onPress={() => savePreferences({...preferences, household_size: Math.min(20, preferences.household_size + 1)})}><Text style={styles.chipText}>+</Text></Pressable>
+      </View>
+      <View style={styles.tip}><Ionicons name="information-circle-outline" color={C.gold} size={20}/><Text style={styles.tipText}>فیلتر حساسیت فقط مواد ثبت‌شده در دستورها را بررسی می‌کند؛ آلودگی متقاطع یا مواد اعلام‌نشده را پوشش نمی‌دهد. در حساسیت شدید، صرفاً به این فیلتر تکیه نکن.</Text></View>
+      <Pressable style={styles.settingRow} onPress={() => Alert.alert("همگام‌سازی", "اتصال Supabase هنوز پیاده‌سازی نشده است.")}><Ionicons name="cloud-outline" size={20} color={C.gold}/><Text style={styles.listTitle}>پشتیبان‌گیری و همگام‌سازی</Text></Pressable>
+      <Pressable style={styles.settingRow} onPress={() => Alert.alert("چی بپزم؟", "نسخه آزمایشی محلی") }><Ionicons name="information-circle-outline" size={20} color={C.gold}/><Text style={styles.listTitle}>درباره برنامه</Text></Pressable>
     </ScrollView>
   );
 

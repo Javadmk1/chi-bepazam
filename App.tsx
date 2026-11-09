@@ -9,6 +9,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { initializeDatabase } from "./src/db/database";
 import { recipes, type Recipe } from "./src/data/recipes";
 import { ingredientSeeds, normalizeIngredient } from "./src/data/ingredients";
+import { rankRecipes } from "./src/engine/matcher";
 
 type PantryItem = { id: number; ingredient_name: string; quantity: number; unit: string };
 type ShoppingItem = { id: number; ingredient_name: string; quantity: number; unit: string; checked: number };
@@ -67,13 +68,15 @@ function AppContent() {
   };
 
   const matchingRecipes = useMemo(() => {
-    return recipes.filter(r => {
-      const q = query.trim();
-      const textMatch = !q || r.title.includes(q) || r.tags.some(t => t.includes(q));
-      const filterMatch = recipeFilter === "همه" || (recipeFilter === "سریع" && r.timeMin <= 30) || (recipeFilter === "اقتصادی" && r.tags.includes("اقتصادی"));
-      return textMatch && filterMatch;
-    });
-  }, [query, filter]);
+    return rankRecipes(recipes, pantry)
+      .filter(({ recipe: r }) => {
+        const q = query.trim();
+        const textMatch = !q || r.title.includes(q) || r.tags.some(t => t.includes(q));
+        const filterMatch = recipeFilter === "همه" || (recipeFilter === "سریع" && r.timeMin <= 30) || (recipeFilter === "اقتصادی" && r.tags.includes("اقتصادی"));
+        return textMatch && filterMatch;
+      })
+      .map(match => match.recipe);
+  }, [query, recipeFilter, pantry]);
 
   const addRecipeToShopping = async (recipe: Recipe) => {
     for (const item of recipe.ingredients) {

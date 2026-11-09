@@ -10,7 +10,7 @@ await fs.mkdir(outputDir, { recursive: true });
 
 const allowedLicense = value => {
   const license = String(value ?? "").toLowerCase();
-  if (license.includes("noncommercial") || license.includes("no derivatives")) return false;
+  if (/\\bNC\\b|\\bND\\b/.test(license) || license.includes("noncommercial") || license.includes("no derivatives")) return false;
   return license.includes("cc0") || license.includes("public domain") ||
     license.includes("cc by") || license.includes("cc-by");
 };

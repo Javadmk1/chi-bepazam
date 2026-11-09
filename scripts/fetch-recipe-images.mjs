@@ -31,7 +31,8 @@ for (const recipe of recipes) {
       format: "json", origin: "*"
     });
     const response = await fetch(`https://commons.wikimedia.org/w/api.php?${params}`, {
-      headers: { "User-Agent": "ChiBepazam/1.0 (recipe photo catalog; open-source app)" }
+      headers: { "User-Agent": "ChiBepazam/1.0 (recipe photo catalog; open-source app)" },
+      signal: AbortSignal.timeout(15000)
     });
     if (!response.ok) throw new Error(`Commons search HTTP ${response.status}`);
     const data = await response.json();
@@ -52,7 +53,8 @@ for (const recipe of recipes) {
 
     usedFileTitles.add(chosen.page.title);
     const imageResponse = await fetch(chosen.info.thumburl, {
-      headers: { "User-Agent": "ChiBepazam/1.0 (recipe photo catalog; open-source app)" }
+      headers: { "User-Agent": "ChiBepazam/1.0 (recipe photo catalog; open-source app)" },
+      signal: AbortSignal.timeout(15000)
     });
     if (!imageResponse.ok) throw new Error(`image HTTP ${imageResponse.status}`);
     const bytes = Buffer.from(await imageResponse.arrayBuffer());

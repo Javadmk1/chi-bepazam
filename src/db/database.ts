@@ -63,14 +63,20 @@ export async function initializeDatabase(db: SQLiteDatabase) {
   };
   await ensureColumn("pantry", "expires_at", "TEXT");
   await ensureColumn("pantry", "cloud_id", "TEXT");
-  await ensureColumn("pantry", "updated_at", "TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP");
-  await ensureColumn("shopping_items", "updated_at", "TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP");
+  await ensureColumn("pantry", "updated_at", "TEXT");
+  await ensureColumn("shopping_items", "updated_at", "TEXT");
   await ensureColumn("shopping_items", "deleted", "INTEGER NOT NULL DEFAULT 0");
   await ensureColumn("shopping_items", "cloud_id", "TEXT");
-  await ensureColumn("user_preferences", "updated_at", "TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP");
-  await ensureColumn("meal_plan", "updated_at", "TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP");
+  await ensureColumn("user_preferences", "updated_at", "TEXT");
+  await ensureColumn("meal_plan", "updated_at", "TEXT");
   await ensureColumn("meal_plan", "deleted", "INTEGER NOT NULL DEFAULT 0");
   await ensureColumn("meal_plan", "cloud_id", "TEXT");
+  await db.execAsync(`
+    UPDATE pantry SET updated_at = CURRENT_TIMESTAMP WHERE updated_at IS NULL;
+    UPDATE shopping_items SET updated_at = CURRENT_TIMESTAMP WHERE updated_at IS NULL;
+    UPDATE user_preferences SET updated_at = CURRENT_TIMESTAMP WHERE updated_at IS NULL;
+    UPDATE meal_plan SET updated_at = CURRENT_TIMESTAMP WHERE updated_at IS NULL;
+  `);
   await db.execAsync(`
     CREATE UNIQUE INDEX IF NOT EXISTS idx_pantry_cloud_id ON pantry(cloud_id) WHERE cloud_id IS NOT NULL;
     CREATE UNIQUE INDEX IF NOT EXISTS idx_shopping_cloud_id ON shopping_items(cloud_id) WHERE cloud_id IS NOT NULL;

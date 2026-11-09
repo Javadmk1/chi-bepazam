@@ -1,0 +1,17 @@
+{
+  "expo": {
+    "name": "چی بپزم؟",
+    "slug": "chi-bepazam",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "userInterfaceStyle": "dark",
+    "newArchEnabled": true,
+    "assetBundlePatterns": ["**/*"],
+    "android": {
+      "package": "com.javadmk1.chibepazam",
+      "versionCode": 1,
+      "edgeToEdgeEnabled": true
+    },
+    "plugins": ["expo-sqlite"]
+  }
+}

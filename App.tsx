@@ -11,6 +11,7 @@ import { recipes, type Recipe } from "./src/data/recipes";
 import { ingredientSeeds, normalizeIngredient } from "./src/data/ingredients";
 import { rankRecipes } from "./src/engine/matcher";
 import { missingRecipeQuantity, scaledRecipeQuantity } from "./src/data/recipe-quantity";
+import { expiryLabel, getExpiryStatus } from "./src/data/expiry";
 
 type PantryItem = { id: number; ingredient_name: string; quantity: number; unit: string; expires_at?: string | null };
 type UserPreferences = { diet: string; allergies_json: string; household_size: number; weekly_budget: number };
@@ -34,6 +35,7 @@ function AppContent() {
   const [newName, setNewName] = useState("");
   const [newQty, setNewQty] = useState("1");
   const [newExpiry, setNewExpiry] = useState("");
+  const [editingPantry, setEditingPantry] = useState<PantryItem | null>(null);
   const [selected, setSelected] = useState<Recipe | null>(null);
   const [planPickerDate, setPlanPickerDate] = useState<string | null>(null);
   const [pantryFilter, setPantryFilter] = useState("همه");
@@ -63,6 +65,22 @@ function AppContent() {
     );
     await loadData();
   };
+
+  const updatePantryItem = async (item: PantryItem, quantity: number, expiresAt: string | null) => {
+    await db.runAsync("UPDATE pantry SET quantity = ?, expires_at = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?", quantity, expiresAt, item.id);
+    await loadData();
+  };
+
+  const openPantryEditor = (item: PantryItem) => {
+    setEditingPantry(item);
+    setNewName(item.ingredient_name);
+    setNewQty(String(item.quantity));
+    setNewExpiry(item.expires_at ?? "");
+    setModal(true);
+  };
+
+  const expiringItems = pantry.filter(item => getExpiryStatus(item.expires_at) === "soon");
+  const expiredItems = pantry.filter(item => getExpiryStatus(item.expires_at) === "expired");
 
   const addShopping = async (name: string, qty = 1, unit = "عدد") => {
     await db.runAsync("INSERT INTO shopping_items (ingredient_name, quantity, unit) VALUES (?, ?, ?) ON CONFLICT(ingredient_name) WHERE checked = 0 DO UPDATE SET quantity = quantity + excluded.quantity", normalizeIngredient(name), qty, unit);
@@ -171,13 +189,14 @@ function AppContent() {
   const Pantry = () => (
     <ScrollView contentContainerStyle={styles.page}>
       <Header title="انبار خانه" subtitle="مواد غذایی موجود در خانه" />
+      {expiredItems.length > 0 || expiringItems.length > 0 ? <View style={[styles.expiryNotice, expiredItems.length > 0 && styles.expiryDanger]}><Ionicons name="alert-circle" size={20} color={expiredItems.length > 0 ? C.red : C.gold}/><Text style={styles.expiryNoticeText}>{expiredItems.length > 0 ? `${expiredItems.length} ماده منقضی‌شده` : ""}{expiredItems.length > 0 && expiringItems.length > 0 ? " · " : ""}{expiringItems.length > 0 ? `${expiringItems.length} ماده با انقضای حداکثر ۷ روز آینده` : ""}</Text></View> : null}
       <TextInput value={query} onChangeText={setQuery} placeholder="جستجو در مواد..." placeholderTextColor={C.muted} style={styles.search}/>
       <View style={styles.filterRow}>{["همه", "سبزیجات", "لبنیات و پروتئین"].map(x => <Pressable key={x} onPress={() => setPantryFilter(x)} style={[styles.chip, pantryFilter === x && styles.chipActive]}><Text style={[styles.chipText, pantryFilter === x && styles.chipTextActive]}>{x}</Text></Pressable>)}</View>
       {pantry.filter(p => p.ingredient_name.includes(query) && (pantryFilter === "همه" || ingredientSeeds.find(i => i.name === p.ingredient_name)?.category === pantryFilter)).map(item => (
-        <View key={item.id} style={styles.listRow}><View style={styles.ingredientIcon}><Text>🥬</Text></View><View style={styles.listMain}><Text style={styles.listTitle}>{item.ingredient_name}</Text><Text style={styles.muted}>{item.quantity} {item.unit}</Text><Text style={styles.muted}>{item.expires_at ? `انقضا: ${item.expires_at}` : "تاریخ انقضا ثبت نشده"}</Text></View><Pressable onPress={() => db.runAsync("UPDATE pantry SET quantity = MAX(0, quantity - 1), updated_at = CURRENT_TIMESTAMP WHERE id = ?", item.id).then(loadData)} hitSlop={8}><Ionicons name="remove-circle-outline" size={20} color={C.gold}/></Pressable><Pressable onPress={() => db.runAsync("UPDATE pantry SET quantity = quantity + 1, updated_at = CURRENT_TIMESTAMP WHERE id = ?", item.id).then(loadData)} hitSlop={8}><Ionicons name="add-circle-outline" size={20} color={C.green2}/></Pressable><Pressable onPress={() => removePantry(item)} hitSlop={10}><Ionicons name="trash-outline" size={19} color={C.red}/></Pressable></View>
+        <View key={item.id} style={styles.listRow}><View style={styles.ingredientIcon}><Text>🥬</Text></View><View style={styles.listMain}><Text style={styles.listTitle}>{item.ingredient_name}</Text><Text style={styles.muted}>{item.quantity} {item.unit}</Text><Text style={styles.muted}>{item.expires_at ? `انقضا: ${item.expires_at} · ${expiryLabel(item.expires_at)}` : "تاریخ انقضا ثبت نشده"}</Text></View><Pressable onPress={() => openPantryEditor(item)} hitSlop={8}><Ionicons name="create-outline" size={19} color={C.gold}/></Pressable><Pressable onPress={() => db.runAsync("UPDATE pantry SET quantity = MAX(0, quantity - 1), updated_at = CURRENT_TIMESTAMP WHERE id = ?", item.id).then(loadData)} hitSlop={8}><Ionicons name="remove-circle-outline" size={20} color={C.gold}/></Pressable><Pressable onPress={() => db.runAsync("UPDATE pantry SET quantity = quantity + 1, updated_at = CURRENT_TIMESTAMP WHERE id = ?", item.id).then(loadData)} hitSlop={8}><Ionicons name="add-circle-outline" size={20} color={C.green2}/></Pressable><Pressable onPress={() => removePantry(item)} hitSlop={10}><Ionicons name="trash-outline" size={19} color={C.red}/></Pressable></View>
       ))}
       {pantry.length === 0 ? <View style={styles.empty}><Text style={styles.emptyEmoji}>🧺</Text><Text style={styles.emptyTitle}>انبارت هنوز خالیه</Text><Text style={styles.muted}>چند ماده پرکاربرد اضافه کن تا پیشنهادهای بهتری بگیری.</Text><Pressable style={styles.greenButton} onPress={addQuickItems}><Text style={styles.greenButtonText}>افزودن مواد پرکاربرد</Text></Pressable></View> : null}
-      <Pressable style={styles.greenButton} onPress={() => { setNewName(""); setNewQty("1"); setNewExpiry(""); setModal(true); }}><Ionicons name="add" size={19} color={C.white}/><Text style={styles.greenButtonText}>افزودن ماده غذایی</Text></Pressable>
+      <Pressable style={styles.greenButton} onPress={() => { setEditingPantry(null); setNewName(""); setNewQty("1"); setNewExpiry(""); setModal(true); }}><Ionicons name="add" size={19} color={C.white}/><Text style={styles.greenButtonText}>افزودن ماده غذایی</Text></Pressable>
     </ScrollView>
   );
 
@@ -282,11 +301,11 @@ function AppContent() {
       </Modal>
       <Modal visible={modal} transparent animationType="fade" onRequestClose={() => setModal(false)}>
         <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : undefined} style={styles.modalShade}>
-          <View style={styles.modalCard}><Text style={styles.modalTitle}>افزودن به انبار</Text>
+          <View style={styles.modalCard}><Text style={styles.modalTitle}>{editingPantry ? "ویرایش ماده غذایی" : "افزودن به انبار"}</Text>
             <TextInput value={newName} onChangeText={setNewName} placeholder="نام ماده غذایی" placeholderTextColor={C.muted} style={styles.input}/>
             <TextInput value={newQty} onChangeText={setNewQty} keyboardType="decimal-pad" placeholder="مقدار موجود" placeholderTextColor={C.muted} style={styles.input}/>
             <TextInput value={newExpiry} onChangeText={setNewExpiry} placeholder="تاریخ انقضا (اختیاری: ۱۴۰۵/۰۸/۲۰)" placeholderTextColor={C.muted} style={styles.input}/>
-            <View style={styles.modalActions}><Pressable style={styles.cancelButton} onPress={() => setModal(false)}><Text style={styles.cancelText}>انصراف</Text></Pressable><Pressable style={styles.greenButtonSmall} onPress={async () => { if (!newName.trim()) { Alert.alert("نام ماده را وارد کن"); return; } const expiryValue = newExpiry.trim().replace(/[۰-۹]/g, digit => String("۰۱۲۳۴۵۶۷۸۹".indexOf(digit))).replace(/[٠-٩]/g, digit => String("٠١٢٣٤٥٦٧٨٩".indexOf(digit))).replace(/-/g, "/"); if (expiryValue && !/^\\d{4}\\/\\d{1,2}\\/\\d{1,2}$/.test(expiryValue)) { Alert.alert("فرمت تاریخ", "تاریخ را به شکل 1405/08/20 وارد کن."); return; } await addPantry(newName, Number(newQty) || 1, expiryValue || null); setModal(false); }}><Text style={styles.greenButtonText}>ذخیره</Text></Pressable></View>
+            <View style={styles.modalActions}><Pressable style={styles.cancelButton} onPress={() => setModal(false)}><Text style={styles.cancelText}>انصراف</Text></Pressable><Pressable style={styles.greenButtonSmall} onPress={async () => { const normalizedQty = newQty.replace(/٫/g, ".").replace(/[۰-۹]/g, digit => String("۰۱۲۳۴۵۶۷۸۹".indexOf(digit))).replace(/[٠-٩]/g, digit => String("٠١٢٣٤٥٦٧٨٩".indexOf(digit))); const quantity = Number(normalizedQty); if (!newName.trim()) { Alert.alert("نام ماده را وارد کن"); return; } if (!Number.isFinite(quantity) || quantity <= 0) { Alert.alert("مقدار نامعتبر", "مقدار باید عددی بزرگ‌تر از صفر باشد."); return; } const expiryValue = newExpiry.trim().replace(/[۰-۹]/g, digit => String("۰۱۲۳۴۵۶۷۸۹".indexOf(digit))).replace(/[٠-٩]/g, digit => String("٠١٢٣٤٥٦٧٨٩".indexOf(digit))).replace(/-/g, "/"); if (expiryValue && !/^\\d{4}\\/\\d{1,2}\\/\\d{1,2}$/.test(expiryValue)) { Alert.alert("فرمت تاریخ", "تاریخ را به شکل 1405/08/20 وارد کن."); return; } if (editingPantry) { await updatePantryItem(editingPantry, quantity, expiryValue || null); } else { await addPantry(newName, quantity, expiryValue || null); } setModal(false); setEditingPantry(null); }}><Text style={styles.greenButtonText}>ذخیره</Text></Pressable></View>
           </View>
         </KeyboardAvoidingView>
       </Modal>
@@ -340,6 +359,9 @@ const styles = StyleSheet.create({
   chipText: { color: C.muted, fontSize: 11 },
   chipTextActive: { color: C.white, fontWeight: "800" },
   listRow: { flexDirection: "row-reverse", alignItems: "center", gap: 12, backgroundColor: C.panel, borderRadius: 14, borderWidth: 1, borderColor: C.line, padding: 13 },
+  expiryNotice: { flexDirection: "row-reverse", alignItems: "center", gap: 8, backgroundColor: "#2A2415", borderColor: C.goldSoft, borderWidth: 1, borderRadius: 12, padding: 12 },
+  expiryDanger: { backgroundColor: "#2B1916", borderColor: C.red },
+  expiryNoticeText: { color: C.text, fontSize: 12, fontWeight: "700", flex: 1, textAlign: "right" },
   ingredientIcon: { width: 38, height: 38, backgroundColor: C.panel2, borderRadius: 12, alignItems: "center", justifyContent: "center" },
   listMain: { flex: 1, alignItems: "flex-end", gap: 3 },
   listTitle: { color: C.text, fontWeight: "700", fontSize: 13, textAlign: "right" },

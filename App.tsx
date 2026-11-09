@@ -175,7 +175,7 @@ function AppContent() {
     <ScrollView contentContainerStyle={styles.page}>
       <Header title="برنامه هفتگی" subtitle="برای وعده‌هایت از قبل برنامه‌ریزی کن" />
       {["شنبه", "یکشنبه", "دوشنبه", "سه‌شنبه", "چهارشنبه", "پنجشنبه", "جمعه"].map((day, i) => (
-        <View key={day} style={styles.dayCard}><View style={styles.dayBadge}><Text style={styles.dayText}>{day}</Text><Text style={styles.dayNumber}>{i + ۱}</Text></View><View style={styles.listMain}><Text style={styles.listTitle}>{i === 0 ? "پاستا مرغ و قارچ" : "برای این روز غذایی انتخاب نشده"}</Text><Text style={styles.muted}>{i === 0 ? "شام • ۲۵ دقیقه" : "برای افزودن غذا لمس کن"}</Text></View><Pressable onPress={() => setTab("پیشنهادها")}><Ionicons name="add-circle-outline" size={24} color={C.gold}/></Pressable></View>
+        <View key={day} style={styles.dayCard}><View style={styles.dayBadge}><Text style={styles.dayText}>{day}</Text><Text style={styles.dayNumber}>{i + 1}</Text></View><View style={styles.listMain}><Text style={styles.listTitle}>{i === 0 ? "پاستا مرغ و قارچ" : "برای این روز غذایی انتخاب نشده"}</Text><Text style={styles.muted}>{i === 0 ? "شام • ۲۵ دقیقه" : "برای افزودن غذا لمس کن"}</Text></View><Pressable onPress={() => setTab("پیشنهادها")}><Ionicons name="add-circle-outline" size={24} color={C.gold}/></Pressable></View>
       ))}
     </ScrollView>
   );

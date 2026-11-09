@@ -8,7 +8,7 @@ const recipeIngredientNames = [...recipesSource.matchAll(/\\bname:\\s*"([^"]+)"/
 const pantryIngredientNames = new Set([...ingredientsSource.matchAll(/\\{\\s*name:\\s*"([^"]+)"/g)].map(match => match[1]));
 const duplicateIds = ids.filter((id, index) => ids.indexOf(id) !== index);
 const missingIngredients = [...new Set(recipeIngredientNames)].filter(name => !pantryIngredientNames.has(name));
-const stepBlocks = [...recipesSource.matchAll(/\\bsteps:\\s*(\\[[^\\n]*\\])/g)];
+const stepBlocks = [...recipesSource.matchAll(/\\bsteps:\\s*(\\[[^\\n]*?\\])(?=,\\s*tags:)/g)];
 const invalidSteps = stepBlocks.filter(match => {
   try {
     const steps = JSON.parse(match[1]);

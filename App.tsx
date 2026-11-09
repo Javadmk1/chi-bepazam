@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { Component, useEffect, useMemo, useState } from "react";
 import {
   Alert, FlatList, Image, KeyboardAvoidingView, Modal, Platform, Pressable,
   ScrollView, StatusBar, StyleSheet, Text, TextInput, View
@@ -607,8 +607,42 @@ function AppContent() {
   );
 }
 
+type BootBoundaryState = { error: Error | null };
+
+class BootErrorBoundary extends Component<React.PropsWithChildren, BootBoundaryState> {
+  state: BootBoundaryState = { error: null };
+
+  static getDerivedStateFromError(error: Error): BootBoundaryState {
+    return { error };
+  }
+
+  componentDidCatch(error: Error) {
+    console.error("[ChiBepazam] Startup/render failure:", error);
+  }
+
+  render() {
+    if (this.state.error) {
+      return (
+        <SafeAreaView style={{ flex: 1, backgroundColor: C.bg, padding: 24, justifyContent: "center" }}>
+          <StatusBar barStyle="light-content" backgroundColor={C.bg}/>
+          <Text style={{ color: C.gold, fontSize: 23, fontWeight: "900", textAlign: "right", marginBottom: 14 }}>برنامه درست راه‌اندازی نشد</Text>
+          <Text style={{ color: C.text, fontSize: 14, textAlign: "right", lineHeight: 25 }}>یک خطای داخلی هنگام باز کردن برنامه رخ داد. برای بررسی دقیق، متن خطا را ثبت کرده‌ایم.</Text>
+          <Text selectable style={{ color: C.muted, fontSize: 11, textAlign: "left", marginTop: 18, lineHeight: 18 }}>{String(this.state.error?.message ?? this.state.error)}</Text>
+        </SafeAreaView>
+      );
+    }
+    return this.props.children;
+  }
+}
+
 export default function App() {
-  return <SQLiteProvider databaseName="chi-bepazam.db" onInit={initializeDatabase}><AppContent/></SQLiteProvider>;
+  return (
+    <BootErrorBoundary>
+      <SQLiteProvider databaseName="chi-bepazam.db" onInit={initializeDatabase}>
+        <AppContent/>
+      </SQLiteProvider>
+    </BootErrorBoundary>
+  );
 }
 
 const styles = StyleSheet.create({

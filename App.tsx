@@ -13,6 +13,7 @@ import { rankRecipes } from "./src/engine/matcher";
 
 type PantryItem = { id: number; ingredient_name: string; quantity: number; unit: string };
 type ShoppingItem = { id: number; ingredient_name: string; quantity: number; unit: string; checked: number };
+type PlanItem = { id: number; meal_date: string; meal_type: string; recipe_id: string };
 
 const C = {
   bg: "#090B0A", panel: "#151816", panel2: "#1D211E", gold: "#E6B33D",
@@ -25,6 +26,7 @@ function AppContent() {
   const [tab, setTab] = useState("خانه");
   const [pantry, setPantry] = useState<PantryItem[]>([]);
   const [shopping, setShopping] = useState<ShoppingItem[]>([]);
+  const [mealPlan, setMealPlan] = useState<PlanItem[]>([]);
   const [query, setQuery] = useState("");
   const [modal, setModal] = useState(false);
   const [newName, setNewName] = useState("");
@@ -36,8 +38,10 @@ function AppContent() {
   const loadData = async () => {
     const p = await db.getAllAsync<PantryItem>("SELECT id, ingredient_name, quantity, unit FROM pantry WHERE deleted = 0 ORDER BY ingredient_name");
     const s = await db.getAllAsync<ShoppingItem>("SELECT id, ingredient_name, quantity, unit, checked FROM shopping_items ORDER BY checked, ingredient_name");
+    const plan = await db.getAllAsync<PlanItem>("SELECT id, meal_date, meal_type, recipe_id FROM meal_plan ORDER BY meal_date");
     setPantry(p);
     setShopping(s);
+    setMealPlan(plan);
   };
 
   useEffect(() => { loadData().catch(() => Alert.alert("خطا", "خواندن اطلاعات محلی انجام نشد.")); }, []);
@@ -53,7 +57,7 @@ function AppContent() {
   };
 
   const addShopping = async (name: string, qty = 1, unit = "عدد") => {
-    await db.runAsync("INSERT INTO shopping_items (ingredient_name, quantity, unit) VALUES (?, ?, ?)", normalizeIngredient(name), qty, unit);
+    await db.runAsync("INSERT INTO shopping_items (ingredient_name, quantity, unit) VALUES (?, ?, ?) ON CONFLICT(ingredient_name) WHERE checked = 0 DO UPDATE SET quantity = quantity + excluded.quantity", normalizeIngredient(name), qty, unit);
     await loadData();
   };
 
@@ -170,17 +174,73 @@ function AppContent() {
       <Header title="لیست خرید" subtitle="چیزهایی که باید تهیه کنی" />
       <View style={styles.summary}><Text style={styles.summaryNumber}>{shopping.filter(x => !x.checked).length}</Text><Text style={styles.summaryText}>مورد برای خرید باقی مانده</Text></View>
       {shopping.map(item => <Pressable key={item.id} onPress={() => toggleShopping(item)} style={styles.listRow}><Ionicons name={item.checked ? "checkbox" : "square-outline"} size={22} color={item.checked ? C.green2 : C.muted}/><View style={styles.listMain}><Text style={[styles.listTitle, !!item.checked && styles.checkedText]}>{item.ingredient_name}</Text><Text style={styles.muted}>{item.quantity} {item.unit}</Text></View></Pressable>)}
+      {shopping.some(item => item.checked) ? <Pressable style={styles.greenButton} onPress={async () => { const bought = shopping.filter(item => item.checked); for (const item of bought) { await db.runAsync("INSERT INTO pantry (ingredient_name, quantity, unit, updated_at, deleted) VALUES (?, ?, ?, CURRENT_TIMESTAMP, 0) ON CONFLICT(ingredient_name) DO UPDATE SET quantity = quantity + excluded.quantity, unit = excluded.unit, updated_at = CURRENT_TIMESTAMP, deleted = 0", item.ingredient_name, item.quantity, item.unit); } await db.runAsync("DELETE FROM shopping_items WHERE checked = 1"); await loadData(); Alert.alert("انبار به‌روز شد", "اقلام خریداری‌شده به انبار خانه منتقل شدند."); }}><Ionicons name="checkmark-done" color={C.white} size={18}/><Text style={styles.greenButtonText}>انتقال خریدها به انبار ({shopping.filter(item => item.checked).length})</Text></Pressable> : null}
       {shopping.length === 0 ? <View style={styles.empty}><Text style={styles.emptyEmoji}>🛒</Text><Text style={styles.emptyTitle}>لیست خرید خالی است</Text><Text style={styles.muted}>از جزئیات دستور پخت، مواد لازم را اضافه کن.</Text></View> : null}
       <Pressable style={styles.outlineButton} onPress={() => Alert.alert("راهنما", "برای افزودن مواد، وارد پیشنهاد غذا شو و یک دستور را باز کن.")}><Text style={styles.outlineButtonText}>چطور لیست خرید بسازم؟</Text></Pressable>
     </ScrollView>
   );
 
+  const weekDays = Array.from({ length: 7 }, (_, index) => {
+    const date = new Date();
+    date.setDate(date.getDate() + index);
+    const iso = [date.getFullYear(), String(date.getMonth() + 1).padStart(2, "0"), String(date.getDate()).padStart(2, "0")].join("-");
+    const names = ["یکشنبه", "دوشنبه", "سه‌شنبه", "چهارشنبه", "پنجشنبه", "جمعه", "شنبه"];
+    return { iso, label: names[date.getDay()], dayNumber: date.getDate() };
+  });
+
+  const chooseMealForDay = (date: string) => {
+    Alert.alert("انتخاب غذا", "برای این روز چه غذایی ثبت شود؟", [
+      ...recipes.map(recipe => ({
+        text: recipe.title,
+        onPress: async () => {
+          await db.runAsync("INSERT INTO meal_plan (meal_date, meal_type, recipe_id) VALUES (?, ?, ?)", date, "شام", recipe.id);
+          await loadData();
+        }
+      })),
+      { text: "انصراف", style: "cancel" }
+    ]);
+  };
+
+  const removeMeal = async (id: number) => {
+    await db.runAsync("DELETE FROM meal_plan WHERE id = ?", id);
+    await loadData();
+  };
+
   const Plan = () => (
     <ScrollView contentContainerStyle={styles.page}>
       <Header title="برنامه هفتگی" subtitle="برای وعده‌هایت از قبل برنامه‌ریزی کن" />
-      {["شنبه", "یکشنبه", "دوشنبه", "سه‌شنبه", "چهارشنبه", "پنجشنبه", "جمعه"].map((day, i) => (
-        <View key={day} style={styles.dayCard}><View style={styles.dayBadge}><Text style={styles.dayText}>{day}</Text><Text style={styles.dayNumber}>{i + 1}</Text></View><View style={styles.listMain}><Text style={styles.listTitle}>{i === 0 ? "پاستا مرغ و قارچ" : "برای این روز غذایی انتخاب نشده"}</Text><Text style={styles.muted}>{i === 0 ? "شام • ۲۵ دقیقه" : "برای افزودن غذا لمس کن"}</Text></View><Pressable onPress={() => setTab("پیشنهادها")}><Ionicons name="add-circle-outline" size={24} color={C.gold}/></Pressable></View>
-      ))}
+      {weekDays.map(day => {
+        const meals = mealPlan.filter(item => item.meal_date === day.iso);
+        return (
+          <View key={day.iso} style={styles.dayCard}>
+            <View style={styles.dayBadge}><Text style={styles.dayText}>{day.label}</Text><Text style={styles.dayNumber}>{day.dayNumber}</Text></View>
+            <View style={styles.listMain}>
+              {meals.length ? meals.map(meal => {
+                const recipe = recipes.find(item => item.id === meal.recipe_id);
+                return recipe ? (
+                  <Pressable key={meal.id} onLongPress={() => removeMeal(meal.id)} onPress={() => setSelected(recipe)}>
+                    <Text style={styles.listTitle}>{recipe.title}</Text>
+                    <Text style={styles.muted}>{meal.meal_type} • {recipe.timeMin} دقیقه · برای حذف نگه دار</Text>
+                  </Pressable>
+                ) : null;
+              }) : <Text style={styles.muted}>برای این روز غذایی انتخاب نشده</Text>}
+            </View>
+            <Pressable onPress={() => chooseMealForDay(day.iso)} hitSlop={10}><Ionicons name="add-circle-outline" size={25} color={C.gold}/></Pressable>
+          </View>
+        );
+      })}
+      <Pressable style={styles.greenButton} onPress={async () => {
+        for (const meal of mealPlan) {
+          const recipe = recipes.find(item => item.id === meal.recipe_id);
+          if (recipe) for (const ingredient of recipe.ingredients) {
+            if (!pantry.some(item => item.ingredient_name === normalizeIngredient(ingredient.name))) {
+              await addShopping(ingredient.name, 1, "مقدار لازم");
+            }
+          }
+        }
+        setTab("لیست خرید");
+        Alert.alert("لیست خرید آماده شد", "مواد دستورهای برنامه‌ریزی‌شده به لیست خرید اضافه شدند.");
+      }}><Ionicons name="cart-outline" color={C.white} size={18}/><Text style={styles.greenButtonText}>ساخت لیست خرید هفتگی</Text></Pressable>
     </ScrollView>
   );
 

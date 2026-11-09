@@ -78,6 +78,9 @@ function AppContent() {
     supabase.auth.getSession().then(({ data }) => setCloudUserEmail(data.session?.user.email ?? null));
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
       setCloudUserEmail(session?.user.email ?? null);
+      if (session?.user.id && _event === "SIGNED_IN") {
+        loadData().catch(() => setCloudSyncMessage("همگام‌سازی پس از ورود ناموفق بود"));
+      }
     });
     return () => subscription.unsubscribe();
   }, []);
@@ -127,7 +130,7 @@ function AppContent() {
   const expiredItems = pantry.filter(item => getExpiryStatus(item.expires_at) === "expired");
 
   const addShopping = async (name: string, qty = 1, unit = "عدد") => {
-    await db.runAsync("INSERT INTO shopping_items (ingredient_name, quantity, unit) VALUES (?, ?, ?) ON CONFLICT(ingredient_name) WHERE checked = 0 DO UPDATE SET quantity = quantity + excluded.quantity", normalizeIngredient(name), qty, unit);
+    await db.runAsync("INSERT INTO shopping_items (ingredient_name, quantity, unit, updated_at, deleted) VALUES (?, ?, ?, CURRENT_TIMESTAMP, 0) ON CONFLICT(ingredient_name) WHERE checked = 0 DO UPDATE SET quantity = quantity + excluded.quantity, updated_at = CURRENT_TIMESTAMP", normalizeIngredient(name), qty, unit);
     await loadData();
   };
 

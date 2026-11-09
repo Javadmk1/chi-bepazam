@@ -26,6 +26,9 @@ jobs:
       - name: Install dependencies
         run: npm install
 
+      - name: Verify Expo native dependency versions
+        run: npx expo install --check
+
       - name: Generate Android project
         run: npx expo prebuild --platform android --no-install
 

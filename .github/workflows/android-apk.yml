@@ -15,6 +15,7 @@ jobs:
     env:
       EXPO_PUBLIC_SUPABASE_URL: ${{ secrets.EXPO_PUBLIC_SUPABASE_URL }}
       EXPO_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.EXPO_PUBLIC_SUPABASE_ANON_KEY }}
+      NODE_ENV: production
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -64,6 +65,9 @@ jobs:
       - name: Generate Android project
         run: npx expo prebuild --platform android --no-install
 
+      - name: Ensure JavaScript is embedded in the debug APK
+        run: node scripts/ensure-embedded-js-bundle.mjs
+
       - name: Diagnose Expo autolinking metadata
         run: node scripts/diagnose-expo-autolinking.mjs
 
@@ -107,6 +111,13 @@ jobs:
             attempt=$((attempt + 1))
             sleep 20
           done
+
+      - name: Verify APK contains the JavaScript bundle
+        working-directory: android
+        run: |
+          APK=app/build/outputs/apk/debug/app-debug.apk
+          test -f "$APK"
+          unzip -l "$APK" | grep -E 'assets/index\.android\.bundle|assets/index\.android\.bundle\.hbc'
 
       - name: Upload APK
         uses: actions/upload-artifact@v4

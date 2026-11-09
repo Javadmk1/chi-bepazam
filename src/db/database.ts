@@ -28,6 +28,7 @@ export async function initializeDatabase(db: SQLiteDatabase) {
       checked INTEGER NOT NULL DEFAULT 0,
       created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
     );
+    DELETE FROM shopping_items WHERE checked = 0 AND id NOT IN (SELECT MIN(id) FROM shopping_items WHERE checked = 0 GROUP BY ingredient_name);
     CREATE UNIQUE INDEX IF NOT EXISTS idx_shopping_open_item ON shopping_items (ingredient_name) WHERE checked = 0;
     CREATE TABLE IF NOT EXISTS meal_plan (
       id INTEGER PRIMARY KEY AUTOINCREMENT,

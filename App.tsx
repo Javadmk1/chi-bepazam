@@ -66,9 +66,19 @@ function AppContent() {
     await loadData();
   };
 
-  const updatePantryItem = async (item: PantryItem, quantity: number, expiresAt: string | null) => {
-    await db.runAsync("UPDATE pantry SET quantity = ?, expires_at = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?", quantity, expiresAt, item.id);
-    await loadData();
+  const updatePantryItem = async (item: PantryItem, name: string, quantity: number, expiresAt: string | null) => {
+    const normalized = normalizeIngredient(name);
+    const seed = ingredientSeeds.find(entry => entry.name === normalized);
+    try {
+      await db.runAsync(
+        "UPDATE pantry SET ingredient_name = ?, quantity = ?, unit = ?, expires_at = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?",
+        normalized, quantity, seed?.unit ?? item.unit, expiresAt, item.id
+      );
+      await loadData();
+    } catch {
+      Alert.alert("نام تکراری", "این ماده از قبل در انبار ثبت شده است.");
+      throw new Error("Duplicate pantry ingredient");
+    }
   };
 
   const openPantryEditor = (item: PantryItem) => {
@@ -386,7 +396,7 @@ function AppContent() {
               if (!Number.isFinite(quantity) || quantity <= 0) { Alert.alert("مقدار نامعتبر", "مقدار باید عددی بزرگ‌تر از صفر باشد."); return; }
               const expiryValue = newExpiry.trim().replace(/[۰-۹]/g, digit => String("۰۱۲۳۴۵۶۷۸۹".indexOf(digit))).replace(/[٠-٩]/g, digit => String("٠١٢٣٤٥٦٧٨٩".indexOf(digit))).replace(/-/g, "/");
               if (expiryValue && !/^\d{4}\/\d{1,2}\/\d{1,2}$/.test(expiryValue)) { Alert.alert("فرمت تاریخ", "تاریخ را به شکل 1405/08/20 وارد کن."); return; }
-              if (editingPantry) await updatePantryItem(editingPantry, quantity, expiryValue || null);
+              if (editingPantry) await updatePantryItem(editingPantry, newName, quantity, expiryValue || null);
               else await addPantry(newName, quantity, expiryValue || null);
               setModal(false);
               setEditingPantry(null);

@@ -88,13 +88,9 @@ function AppContent() {
     if (!supabase) return;
     supabase.auth.getSession().then(({ data }) => {
       setCloudUserEmail(data.session?.user.email ?? null);
-      if (data.session?.user.id) loadData().catch(() => setCloudSyncMessage("همگام‌سازی پس از ورود ناموفق بود"));
     });
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
       setCloudUserEmail(session?.user.email ?? null);
-      if (session?.user.id && _event === "SIGNED_IN") {
-        loadData().catch(() => setCloudSyncMessage("همگام‌سازی پس از ورود ناموفق بود"));
-      }
     });
     return () => subscription.unsubscribe();
   }, []);
@@ -442,7 +438,8 @@ function AppContent() {
       setCloudUserEmail(data.user?.email ?? cloudEmail.trim());
       setCloudCodeSent(false);
       setCloudCode("");
-      Alert.alert("ورود موفق", "حساب کاربری متصل شد. اطلاعات محلی هنوز به فضای ابری منتقل نشده‌اند.");
+      await loadData();
+      Alert.alert("ورود موفق", "حساب متصل شد و همگام‌سازی اولیه انجام شد.");
     }
   };
 

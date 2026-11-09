@@ -19,8 +19,7 @@ export async function initializeDatabase(db: SQLiteDatabase) {
       expires_at TEXT,
       updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
       deleted INTEGER NOT NULL DEFAULT 0,
-      cloud_id TEXT,
-      updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+      cloud_id TEXT
     );
     CREATE TABLE IF NOT EXISTS shopping_items (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -33,8 +32,14 @@ export async function initializeDatabase(db: SQLiteDatabase) {
       deleted INTEGER NOT NULL DEFAULT 0,
       cloud_id TEXT
     );
-    DELETE FROM shopping_items WHERE checked = 0 AND id NOT IN (SELECT MIN(id) FROM shopping_items WHERE checked = 0 GROUP BY ingredient_name);
-    CREATE UNIQUE INDEX IF NOT EXISTS idx_shopping_open_item ON shopping_items (ingredient_name) WHERE checked = 0;
+    UPDATE shopping_items
+      SET quantity = (SELECT SUM(x.quantity) FROM shopping_items x WHERE x.ingredient_name = shopping_items.ingredient_name),
+          checked = (SELECT MIN(x.checked) FROM shopping_items x WHERE x.ingredient_name = shopping_items.ingredient_name),
+          deleted = (SELECT MIN(x.deleted) FROM shopping_items x WHERE x.ingredient_name = shopping_items.ingredient_name)
+      WHERE id IN (SELECT MIN(id) FROM shopping_items GROUP BY ingredient_name);
+    DELETE FROM shopping_items WHERE id NOT IN (SELECT MIN(id) FROM shopping_items GROUP BY ingredient_name);
+    DROP INDEX IF EXISTS idx_shopping_open_item;
+    CREATE UNIQUE INDEX IF NOT EXISTS idx_shopping_item_name ON shopping_items (ingredient_name);
     CREATE TABLE IF NOT EXISTS user_preferences (
       id INTEGER PRIMARY KEY CHECK (id = 1),
       diet TEXT NOT NULL DEFAULT 'همه',
@@ -78,6 +83,8 @@ export async function initializeDatabase(db: SQLiteDatabase) {
     UPDATE meal_plan SET updated_at = CURRENT_TIMESTAMP WHERE updated_at IS NULL;
   `);
   await db.execAsync(`
+    DELETE FROM meal_plan WHERE id NOT IN (SELECT MIN(id) FROM meal_plan GROUP BY meal_date, meal_type, recipe_id);
+    CREATE UNIQUE INDEX IF NOT EXISTS idx_meal_plan_slot ON meal_plan(meal_date, meal_type, recipe_id);
     CREATE UNIQUE INDEX IF NOT EXISTS idx_pantry_cloud_id ON pantry(cloud_id) WHERE cloud_id IS NOT NULL;
     CREATE UNIQUE INDEX IF NOT EXISTS idx_shopping_cloud_id ON shopping_items(cloud_id) WHERE cloud_id IS NOT NULL;
     CREATE UNIQUE INDEX IF NOT EXISTS idx_meal_plan_cloud_id ON meal_plan(cloud_id) WHERE cloud_id IS NOT NULL;

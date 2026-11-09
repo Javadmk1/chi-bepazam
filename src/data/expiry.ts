@@ -22,7 +22,8 @@ export function getExpiryStatus(rawDate?: string | null, now = new Date()): Expi
   const year = Number(match[1]);
   const month = Number(match[2]);
   const day = Number(match[3]);
-  const maxDay = month >= 1 && month <= 6 ? 31 : month >= 7 && month <= 11 ? 30 : 29;
+  const esfandDays = jalaliDayNumber(year + 1, 1, 1) - jalaliDayNumber(year, 1, 1) - 336;
+  const maxDay = month >= 1 && month <= 6 ? 31 : month >= 7 && month <= 11 ? 30 : esfandDays;
   if (year < 1200 || month < 1 || month > 12 || day < 1 || day > maxDay) return "unknown";
 
   try {

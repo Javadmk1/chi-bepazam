@@ -68,6 +68,7 @@ export const ingredientSeeds: IngredientSeed[] = [
   { name: "کدو سبز", category: "سبزیجات", unit: "گرم", aliases: ["کدو"] }
   { name: "کاهو", category: "سبزیجات", unit: "گرم", aliases: [] },
   { name: "پنیر پیتزا", category: "لبنیات", unit: "گرم", aliases: ["پنیر موزارلا"] }
+  { name: "بلغور", category: "غلات", unit: "گرم", aliases: [] }
 ];
 
 export function normalizeIngredient(input: string): string {

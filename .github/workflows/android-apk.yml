@@ -29,6 +29,9 @@ jobs:
       - name: Verify Expo native dependency versions
         run: npx expo install --check
 
+      - name: Fetch openly licensed recipe photos
+        run: node scripts/fetch-recipe-images.mjs
+
       - name: Generate Android project
         run: npx expo prebuild --platform android --no-install
 
@@ -40,6 +43,9 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: chi-bepazam-debug-apk
-          path: android/app/build/outputs/apk/debug/app-debug.apk
+          path: |
+            android/app/build/outputs/apk/debug/app-debug.apk
+            assets/recipes/ATTRIBUTION.txt
+            assets/recipes/image-fetch-report.json
           if-no-files-found: error
           retention-days: 14

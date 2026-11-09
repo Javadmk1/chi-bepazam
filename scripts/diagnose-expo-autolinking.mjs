@@ -20,10 +20,14 @@ try {
 }
 const modules = config.modules ?? [];
 console.log("Expo autolinking modules:", modules.length);
+const invalidPublications = [];
 for (const [index, module] of modules.entries()) {
   const projects = module.projects ?? [];
   for (const [projectIndex, project] of projects.entries()) {
     if (project.publication) {
+      if (!project.publication.version) {
+        invalidPublications.push({ packageName: module.packageName, projectName: project.name, publication: project.publication });
+      }
       console.log(JSON.stringify({
         moduleIndex: index,
         packageName: module.packageName ?? module.name ?? module.path,
@@ -34,3 +38,9 @@ for (const [index, module] of modules.entries()) {
     }
   }
 }
+
+if (invalidPublications.length) {
+  console.error("Expo Android publication metadata is missing required version fields:", JSON.stringify(invalidPublications, null, 2));
+  process.exit(1);
+}
+console.log("Expo Android publication metadata validation passed.");

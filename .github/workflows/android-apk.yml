@@ -44,6 +44,9 @@ jobs:
             echo "Supabase public client configuration is present."
           fi
 
+      - name: Fix expo-font publication metadata
+        run: node scripts/fix-expo-font-publication.mjs
+
       - name: Fetch openly licensed recipe photos
         id: recipe_photos
         timeout-minutes: 2

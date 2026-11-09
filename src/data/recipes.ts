@@ -6,6 +6,7 @@ export type Recipe = {
   calories: number;
   rating: number;
   image: string;
+  imageUrl?: string;
   ingredients: { name: string; qty: string }[];
   steps: string[];
   tags: string[];

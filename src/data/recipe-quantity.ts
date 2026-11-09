@@ -8,7 +8,7 @@ const digitMap: Record<string, string> = {
 };
 
 export function parseRecipeQuantity(raw: string): ParsedQuantity {
-  const value = raw.trim().replace(/[۰-۹٠-٩]/g, d => digitMap[d] ?? d).replace(/ي/g,"ی").replace(/ك/g,"ک");
+  const value = raw.trim().replace(/[۰-۹٠-٩]/g, d => digitMap[d] ?? d).replace(/ي/g,"ی").replace(/ك/g,"ک").replace(/٫/g,".");
   if (!value || /به مقدار لازم|دلخواه|اختیاری/.test(value)) return null;
   const fractions: Record<string, number> = { "نصف": 0.5, "یک‌چهارم": 0.25, "ربع": 0.25, "سه‌چهارم": 0.75 };
   const fraction = Object.entries(fractions).find(([word]) => value.startsWith(word));

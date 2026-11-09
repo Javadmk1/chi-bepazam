@@ -30,6 +30,14 @@ export async function initializeDatabase(db: SQLiteDatabase) {
     );
     DELETE FROM shopping_items WHERE checked = 0 AND id NOT IN (SELECT MIN(id) FROM shopping_items WHERE checked = 0 GROUP BY ingredient_name);
     CREATE UNIQUE INDEX IF NOT EXISTS idx_shopping_open_item ON shopping_items (ingredient_name) WHERE checked = 0;
+    CREATE TABLE IF NOT EXISTS user_preferences (
+      id INTEGER PRIMARY KEY CHECK (id = 1),
+      diet TEXT NOT NULL DEFAULT 'همه',
+      allergies_json TEXT NOT NULL DEFAULT '[]',
+      household_size INTEGER NOT NULL DEFAULT 2,
+      weekly_budget REAL NOT NULL DEFAULT 0
+    );
+    INSERT OR IGNORE INTO user_preferences (id, diet, allergies_json, household_size, weekly_budget) VALUES (1, 'همه', '[]', 2, 0);
     CREATE TABLE IF NOT EXISTS meal_plan (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       meal_date TEXT NOT NULL,

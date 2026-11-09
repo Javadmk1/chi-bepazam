@@ -7,7 +7,7 @@ returns trigger
 language plpgsql
 as $$
 begin
-  new.updated_at = timezone('utc', now());
+  new.updated_at = now();
   return new;
 end;
 $$;
@@ -19,8 +19,8 @@ create table if not exists public.pantry_items (
   quantity numeric(12,3) not null default 1 check (quantity >= 0),
   unit text not null check (length(trim(unit)) between 1 and 24),
   expires_at date,
-  created_at timestamptz not null default timezone('utc', now()),
-  updated_at timestamptz not null default timezone('utc', now()),
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
   deleted_at timestamptz,
   unique (user_id, ingredient_name)
 );
@@ -32,8 +32,8 @@ create table if not exists public.shopping_items (
   quantity numeric(12,3) not null default 1 check (quantity > 0),
   unit text not null check (length(trim(unit)) between 1 and 24),
   checked boolean not null default false,
-  created_at timestamptz not null default timezone('utc', now()),
-  updated_at timestamptz not null default timezone('utc', now()),
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
   deleted_at timestamptz
 );
 
@@ -43,8 +43,8 @@ create table if not exists public.meal_plan_items (
   meal_date date not null,
   meal_type text not null check (length(trim(meal_type)) between 1 and 32),
   recipe_id text not null,
-  created_at timestamptz not null default timezone('utc', now()),
-  updated_at timestamptz not null default timezone('utc', now()),
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
   deleted_at timestamptz
 );
 
@@ -54,7 +54,7 @@ create table if not exists public.user_preferences (
   allergies jsonb not null default '[]'::jsonb check (jsonb_typeof(allergies) = 'array'),
   household_size integer not null default 2 check (household_size between 1 and 30),
   weekly_budget numeric(14,2) not null default 0 check (weekly_budget >= 0),
-  updated_at timestamptz not null default timezone('utc', now())
+  updated_at timestamptz not null default now()
 );
 
 create index if not exists pantry_items_user_updated_idx on public.pantry_items(user_id, updated_at);

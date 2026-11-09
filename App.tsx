@@ -237,7 +237,7 @@ function AppContent() {
 
   const Suggestions = () => (
     <ScrollView contentContainerStyle={styles.page}>
-      <Header title="پیشنهاد غذا" subtitle="غذای مناسب با شرایط تو" />
+      <Header title="پیشنهاد غذا" subtitle={`${recipes.length} دستور پخت؛ مرتب‌شده بر اساس مواد موجود`} />
       <TextInput value={query} onChangeText={setQuery} placeholder="نام غذا یا نوع آن را جستجو کن..." placeholderTextColor={C.muted} style={styles.search}/>
       <View style={styles.filterRow}>{["همه", "سریع", "اقتصادی"].map(x => <Pressable key={x} onPress={() => setRecipeFilter(x)} style={[styles.chip, recipeFilter === x && styles.chipActive]}><Text style={[styles.chipText, recipeFilter === x && styles.chipTextActive]}>{x}</Text></Pressable>)}</View>
       {matchingRecipes.map(r => <RecipeCard key={r.id} recipe={r}/>)}

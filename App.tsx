@@ -8,6 +8,7 @@ import { SQLiteProvider, useSQLiteContext } from "expo-sqlite";
 import { Ionicons } from "@expo/vector-icons";
 import { initializeDatabase } from "./src/db/database";
 import { recipes, type Recipe } from "./src/data/recipes";
+import { recipeImages } from "./src/data/recipe-images";
 import { ingredientSeeds, normalizeIngredient } from "./src/data/ingredients";
 import { rankRecipes } from "./src/engine/matcher";
 import { missingRecipeQuantity, scaledRecipeQuantity } from "./src/data/recipe-quantity";
@@ -28,6 +29,10 @@ const C = {
 
 function FoodArt({ recipe, large = false }: { recipe: Recipe; large?: boolean }) {
   const [failed, setFailed] = useState(false);
+  const localImage = recipeImages[recipe.id];
+  if (localImage && !failed) {
+    return <Image source={localImage} resizeMode="cover" onError={() => setFailed(true)} style={large ? styles.foodArtLarge : styles.foodArtThumb}/>;
+  }
   if (recipe.imageUrl && !failed) {
     return <Image source={{ uri: recipe.imageUrl }} resizeMode="cover" onError={() => setFailed(true)} style={large ? styles.foodArtLarge : styles.foodArtThumb}/>;
   }

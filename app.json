@@ -15,8 +15,7 @@
       "edgeToEdgeEnabled": true
     },
     "plugins": [
-      "expo-sqlite",
-      "expo-secure-store"
+      "expo-sqlite"
     ],
     "scheme": "chibepazam"
   }

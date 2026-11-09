@@ -10,6 +10,7 @@ import { initializeDatabase } from "./src/db/database";
 import { recipes, type Recipe } from "./src/data/recipes";
 import { ingredientSeeds, normalizeIngredient } from "./src/data/ingredients";
 import { rankRecipes } from "./src/engine/matcher";
+import { missingRecipeQuantity, scaledRecipeQuantity } from "./src/data/recipe-quantity";
 
 type PantryItem = { id: number; ingredient_name: string; quantity: number; unit: string; expires_at?: string | null };
 type UserPreferences = { diet: string; allergies_json: string; household_size: number; weekly_budget: number };
@@ -97,12 +98,20 @@ function AppContent() {
 
   const addRecipeToShopping = async (recipe: Recipe) => {
     for (const item of recipe.ingredients) {
-      const owned = pantry.some(p => p.ingredient_name === normalizeIngredient(item.name));
-      if (!owned) await addShopping(item.name, 1, ingredientSeeds.find(seed => seed.name === normalizeIngredient(item.name))?.unit ?? "عدد");
+      const normalized = normalizeIngredient(item.name);
+      const owned = pantry.find(p => normalizeIngredient(p.ingredient_name) === normalized);
+      const need = missingRecipeQuantity(item.qty, owned?.quantity ?? 0, owned?.unit ?? "", preferences.household_size, 2);
+      if (need) {
+        await db.runAsync(
+          "INSERT INTO shopping_items (ingredient_name, quantity, unit) VALUES (?, ?, ?) ON CONFLICT(ingredient_name) WHERE checked = 0 DO UPDATE SET quantity = quantity + excluded.quantity, unit = excluded.unit",
+          normalized, need.quantity, need.unit
+        );
+      }
     }
+    await loadData();
     setSelected(null);
     setTab("لیست خرید");
-    Alert.alert("انجام شد", "مواد موردنیاز به لیست خرید اضافه شدند.");
+    Alert.alert("انجام شد", "کسری مواد براساس تعداد نفرات و موجودی هم‌واحد انبار محاسبه شد. موارد با واحد متفاوت، کامل در لیست خرید آمده‌اند.");
   };
 
   const addQuickItems = async () => {
@@ -242,13 +251,15 @@ function AppContent() {
         for (const meal of mealPlan) {
           const recipe = recipes.find(item => item.id === meal.recipe_id);
           if (recipe) for (const ingredient of recipe.ingredients) {
-            if (!pantry.some(item => item.ingredient_name === normalizeIngredient(ingredient.name))) {
-              await addShopping(ingredient.name, 1, ingredientSeeds.find(seed => seed.name === normalizeIngredient(ingredient.name))?.unit ?? "عدد");
-            }
+            const normalized = normalizeIngredient(ingredient.name);
+            const owned = pantry.find(item => normalizeIngredient(item.ingredient_name) === normalized);
+            const need = missingRecipeQuantity(ingredient.qty, owned?.quantity ?? 0, owned?.unit ?? "", preferences.household_size, 2);
+            if (need) await db.runAsync("INSERT INTO shopping_items (ingredient_name, quantity, unit) VALUES (?, ?, ?) ON CONFLICT(ingredient_name) WHERE checked = 0 DO UPDATE SET quantity = quantity + excluded.quantity, unit = excluded.unit", normalized, need.quantity, need.unit);
           }
         }
+        await loadData();
         setTab("لیست خرید");
-        Alert.alert("لیست خرید آماده شد", "مواد دستورهای برنامه‌ریزی‌شده به لیست خرید اضافه شدند.");
+        Alert.alert("لیست خرید آماده شد", "کسری مواد دستورهای برنامه‌ریزی‌شده با مقیاس تعداد نفرات محاسبه شد.");
       }}><Ionicons name="cart-outline" color={C.white} size={18}/><Text style={styles.greenButtonText}>ساخت لیست خرید هفتگی</Text></Pressable>
     </ScrollView>
   );
@@ -273,7 +284,7 @@ function AppContent() {
         savePreferences({...preferences, allergies_json: JSON.stringify(values)}).then(() => Alert.alert("ذخیره شد", "فیلتر مواد انتخاب‌شده در پیشنهاد غذا اعمال شد."));
       }}><Text style={styles.greenButtonText}>ذخیره حساسیت‌ها</Text></Pressable>
       <SectionTitle title="تعداد نفرات"/>
-      <Text style={styles.muted}>تعداد نفرات ذخیره می‌شود؛ محاسبه خودکار مقادیر تا استانداردسازی واحدهای دستورها فعال نشده است.</Text>
+      <Text style={styles.muted}>مقدار مواد دستورها برای تعداد انتخاب‌شده مقیاس می‌شود. برای مواد با واحد متفاوت از انبار، مقدار کامل دستور در لیست خرید می‌آید.</Text>
       <View style={[styles.filterRow, {alignItems:"center"}]}>
         <Pressable style={styles.chip} onPress={() => savePreferences({...preferences, household_size: Math.max(1, preferences.household_size - 1)})}><Text style={styles.chipText}>−</Text></Pressable>
         <Text style={styles.listTitle}>{preferences.household_size} نفر</Text>
@@ -305,7 +316,7 @@ function AppContent() {
             <Text style={styles.detailTitle}>{selected.title}</Text><Text style={styles.muted}>{selected.subtitle}</Text>
             <View style={styles.metaPanel}><Text style={styles.metaText}>⏱ {selected.timeMin} دقیقه</Text><Text style={styles.metaText}>🔥 {selected.calories} کالری</Text><Text style={styles.metaText}>⭐ {selected.rating}</Text></View>
             <SectionTitle title="مواد لازم"/>
-            {selected.ingredients.map(x => <View key={x.name} style={styles.ingredientLine}><Text style={styles.listTitle}>{x.name}</Text><Text style={styles.muted}>{x.qty}</Text></View>)}
+            {selected.ingredients.map(x => <View key={x.name} style={styles.ingredientLine}><Text style={styles.listTitle}>{x.name}</Text><Text style={styles.muted}>{scaledRecipeQuantity(x.qty, preferences.household_size, 2)}</Text></View>)}
             <SectionTitle title="مراحل پخت"/>
             {selected.steps.map((x, i) => <View key={x} style={styles.step}><Text style={styles.stepNum}>{i + 1}</Text><Text style={styles.stepText}>{x}</Text></View>)}
             <Pressable style={styles.greenButton} onPress={() => addRecipeToShopping(selected)}><Ionicons name="cart-outline" color={C.white} size={19}/><Text style={styles.greenButtonText}>افزودن مواد به لیست خرید</Text></Pressable>

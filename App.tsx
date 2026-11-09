@@ -77,7 +77,6 @@ function AppContent() {
       await loadData();
     } catch {
       Alert.alert("نام تکراری", "این ماده از قبل در انبار ثبت شده است.");
-      throw new Error("Duplicate pantry ingredient");
     }
   };
 

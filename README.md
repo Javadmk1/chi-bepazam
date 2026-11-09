@@ -1,24 +1,48 @@
 # چی بپزم؟ | Chi Bepazam
 
-An offline-first meal planning app for Android, built with Expo, React Native, TypeScript and SQLite.
+اپلیکیشن اندرویدی پیشنهاد غذا و مدیریت مواد غذایی با رویکرد آفلاین‌محور.
 
-## Product direction
-- Premium charcoal / black and gold visual identity with green primary actions.
-- Persian-first RTL interface, with architecture ready for English localization.
-- Local-first pantry, recipe matching, meal planning and shopping list.
-- Backend synchronization is intentionally deferred until the local MVP is stable.
+## فناوری‌ها
+- Expo + React Native + TypeScript
+- SQLite برای نگهداری داده‌ها روی دستگاه
+- Zustand برای مدیریت وضعیت
+- GitHub Actions برای اعتبارسنجی و ساخت APK آزمایشی
 
-## Development
+## قابلیت‌های پیاده‌سازی‌شده
+- رابط فارسی راست‌به‌چپ با تم زغالی، طلایی و سبز
+- خانه، پیشنهاد غذا، انبار، دستور پخت، برنامه هفتگی، لیست خرید و تنظیمات اولیه
+- ذخیره محلی مواد غذایی و اقلام خرید
+- نرمال‌سازی اولیه نام مواد با نام‌های جایگزین فارسی و انگلیسی
+- مرتب‌سازی پیشنهادها بر اساس میزان مواد موجود و زمان پخت
+- افزودن غذا به برنامه هفتگی و حذف آن با نگه‌داشتن روی وعده
+- ساخت لیست خرید از برنامه هفتگی
+- انتقال اقلام خریداری‌شده به انبار
+- کاتالوگ شروع شامل دستورهای غذای ایرانی
+
+## اجرای محلی
+نیازمند Node.js 20 یا بالاتر:
 ```bash
 npm install
 npx expo start
 ```
 
-## Current milestone
-MVP foundation: app shell, navigation, local data model, recipe discovery, pantry and shopping list workflows.
+## ساخت APK آزمایشی از GitHub با گوشی
+1. وارد مخزن GitHub شوید.
+2. به تب Actions بروید.
+3. گردش کار **Build Android test APK** را انتخاب کنید.
+4. روی **Run workflow** بزنید.
+5. پس از پایان موفق، از بخش Artifacts فایل `chi-bepazam-debug-apk` را دریافت کنید.
+6. APK داخل ZIP را روی گوشی نصب کنید.
 
-## Planned milestones
-1. Local MVP and recipe catalogue.
-2. Weekly planning and robust ingredient normalization.
-3. Optional Supabase authentication and sync.
-4. Premium features and release hardening.
+این خروجی برای تست داخلی است؛ نسخه انتشار فروشگاهی نیست و هنوز باید روی چند دستگاه واقعی آزمایش شود.
+
+## وضعیت فعلی و کارهای باقی‌مانده
+- کاتالوگ فعلی نمونه اولیه است و باید از نظر تعداد، دقت مقادیر و دستورها توسعه یابد.
+- تصاویر واقعی غذا و دارایی‌های گرافیکی نهایی هنوز جایگزین ایموجی‌ها نشده‌اند.
+- فیلترهای رژیم و حساسیت، بودجه و اندازه خانوار باید تکمیل شوند.
+- محاسبه دقیق واحدها و مقدار مواد برای لیست خرید نیازمند تکمیل است.
+- همگام‌سازی Supabase، حساب کاربری و اشتراک هنوز پیاده‌سازی نشده‌اند.
+- APK هنوز در دستگاه واقعی تست نشده است.
+
+## جهت طراحی
+تم مشکی/زغالی، جزئیات طلایی، دکمه‌های سبز و تجربه فارسی RTL؛ مطابق مرجع بصری تأییدشده محصول.

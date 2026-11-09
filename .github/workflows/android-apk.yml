@@ -45,6 +45,9 @@ jobs:
           fi
 
       - name: Fetch openly licensed recipe photos
+        id: recipe_photos
+        timeout-minutes: 2
+        continue-on-error: true
         run: node scripts/fetch-recipe-images.mjs
 
       - name: Generate Android project

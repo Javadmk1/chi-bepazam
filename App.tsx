@@ -41,6 +41,8 @@ function FoodArt({ recipe, large = false }: { recipe: Recipe; large?: boolean })
 
 function AppContent() {
   const db = useSQLiteContext();
+  const [dbReady, setDbReady] = useState(false);
+  const [dbError, setDbError] = useState<string | null>(null);
   const [tab, setTab] = useState("خانه");
   const [pantry, setPantry] = useState<PantryItem[]>([]);
   const [shopping, setShopping] = useState<ShoppingItem[]>([]);
@@ -87,7 +89,26 @@ function AppContent() {
     if (prefs) { setPreferences(prefs); try { setAllergyInput((JSON.parse(prefs.allergies_json) as string[]).join(", ")); } catch { setAllergyInput(""); } }
   };
 
-  useEffect(() => { loadData().catch(() => Alert.alert("خطا", "خواندن اطلاعات محلی انجام نشد.")); }, []);
+  useEffect(() => {
+    let active = true;
+    (async () => {
+      try {
+        // Initialize SQLite after the first React frame so a database error
+        // cannot prevent the root React view from mounting on Android.
+        await initializeDatabase(db);
+        if (!active) return;
+        setDbReady(true);
+        try {
+          await loadData();
+        } catch (error) {
+          if (active) setDbError("پایگاه داده آماده شد، اما خواندن اطلاعات ناموفق بود: " + String((error as Error)?.message ?? error));
+        }
+      } catch (error) {
+        if (active) setDbError("راه‌اندازی پایگاه داده ناموفق بود: " + String((error as Error)?.message ?? error));
+      }
+    })();
+    return () => { active = false; };
+  }, [db]);
 
   useEffect(() => {
     if (!supabase) return;
@@ -544,6 +565,17 @@ function AppContent() {
     { name: "برنامه", icon: "calendar-outline" }
   ] as const;
 
+  if (!dbReady) {
+    return (
+      <SafeAreaView style={{ flex: 1, backgroundColor: C.bg, padding: 24, justifyContent: "center" }}>
+        <StatusBar barStyle="light-content" backgroundColor={C.bg}/>
+        <Text style={{ color: C.gold, fontSize: 26, fontWeight: "900", textAlign: "right", marginBottom: 12 }}>چی بپزم؟</Text>
+        <Text style={{ color: C.text, fontSize: 16, textAlign: "right", lineHeight: 28 }}>در حال آماده‌سازی اطلاعات برنامه…</Text>
+        {dbError ? <Text selectable style={{ color: C.red, fontSize: 13, textAlign: "left", lineHeight: 22, marginTop: 18 }}>{dbError}</Text> : null}
+      </SafeAreaView>
+    );
+  }
+
   return (
     <SafeAreaView style={styles.safe}>
       <StatusBar barStyle="light-content" backgroundColor={C.bg}/>
@@ -638,7 +670,7 @@ class BootErrorBoundary extends Component<React.PropsWithChildren, BootBoundaryS
 export default function App() {
   return (
     <BootErrorBoundary>
-      <SQLiteProvider databaseName="chi-bepazam.db" onInit={initializeDatabase}>
+      <SQLiteProvider databaseName="chi-bepazam.db">
         <AppContent/>
       </SQLiteProvider>
     </BootErrorBoundary>

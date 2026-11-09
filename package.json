@@ -23,7 +23,8 @@
     "zustand": "^5.0.8",
     "@supabase/supabase-js": "^2.80.0",
     "expo-secure-store": "~15.0.8",
-    "react-native-url-polyfill": "^2.0.0"
+    "react-native-url-polyfill": "^2.0.0",
+    "expo-font": "~14.0.12"
   },
   "devDependencies": {
     "@types/react": "~19.1.10",

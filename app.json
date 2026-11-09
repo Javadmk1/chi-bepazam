@@ -6,12 +6,18 @@
     "orientation": "portrait",
     "userInterfaceStyle": "dark",
     "newArchEnabled": true,
-    "assetBundlePatterns": ["**/*"],
+    "assetBundlePatterns": [
+      "**/*"
+    ],
     "android": {
       "package": "com.javadmk1.chibepazam",
       "versionCode": 1,
       "edgeToEdgeEnabled": true
     },
-    "plugins": ["expo-sqlite"]
+    "plugins": [
+      "expo-sqlite",
+      "expo-secure-store"
+    ],
+    "scheme": "chibepazam"
   }
 }

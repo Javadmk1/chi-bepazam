@@ -6,13 +6,13 @@ const ingredientsSource = fs.readFileSync("src/data/ingredients.ts", "utf8");
 const ids = [...recipesSource.matchAll(/\bid:\s*"([^"]+)"/g)].map(match => match[1]);
 const recipeIngredientNames = [...recipesSource.matchAll(/\bname:\s*"([^"]+)"/g)].map(match => match[1]);
 const pantryIngredientNames = new Set([...ingredientsSource.matchAll(/\{\s*name:\s*"([^"]+)"/g)].map(match => match[1]));
-const seedEntries = [...ingredientsSource.matchAll(/\\{\\s*name:\\s*"([^"]+)", category:\\s*"[^"]+", unit:\\s*"([^"]+)"/g)];
+const seedEntries = [...ingredientsSource.matchAll(/\{\s*name:\s*"([^"]+)", category:\s*"[^"]+", unit:\s*"([^"]+)"/g)];
 const seedUnits = new Map(seedEntries.map(match => [match[1], match[2]]));
 const duplicateSeedNames = seedEntries.map(match => match[1]).filter((name, index, all) => all.indexOf(name) !== index);
-const ingredientPairs = [...recipesSource.matchAll(/\\{\\s*name:\\s*"([^"]+)",\\s*qty:\\s*"([^"]+)"\\s*\\}/g)];
+const ingredientPairs = [...recipesSource.matchAll(/\{\s*name:\s*"([^"]+)",\s*qty:\s*"([^"]+)"\s*\}/g)];
 const unitMismatches = ingredientPairs.filter(match => {
   const normalized = match[2].replace(/[۰-۹]/g, digit => String("۰۱۲۳۴۵۶۷۸۹".indexOf(digit))).replace(/٫/g, ".");
-  const quantityMatch = normalized.match(/^\\d+(?:\\.\\d+)?\\s*(.*)$/);
+  const quantityMatch = normalized.match(/^\d+(?:\.\d+)?\s*(.*)$/);
   const recipeUnit = quantityMatch?.[1]?.trim() || "عدد";
   const normalizedUnit = recipeUnit === "کیلوگرم" || recipeUnit === "کیلو" ? "گرم" :
     recipeUnit === "لیتر" || recipeUnit === "میلی لیتر" ? "میلی‌لیتر" : recipeUnit;

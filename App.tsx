@@ -75,7 +75,10 @@ function AppContent() {
 
   useEffect(() => {
     if (!supabase) return;
-    supabase.auth.getSession().then(({ data }) => setCloudUserEmail(data.session?.user.email ?? null));
+    supabase.auth.getSession().then(({ data }) => {
+      setCloudUserEmail(data.session?.user.email ?? null);
+      if (data.session?.user.id) loadData().catch(() => setCloudSyncMessage("همگام‌سازی پس از ورود ناموفق بود"));
+    });
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
       setCloudUserEmail(session?.user.email ?? null);
       if (session?.user.id && _event === "SIGNED_IN") {
@@ -130,7 +133,7 @@ function AppContent() {
   const expiredItems = pantry.filter(item => getExpiryStatus(item.expires_at) === "expired");
 
   const addShopping = async (name: string, qty = 1, unit = "عدد") => {
-    await db.runAsync("INSERT INTO shopping_items (ingredient_name, quantity, unit, updated_at, deleted) VALUES (?, ?, ?, CURRENT_TIMESTAMP, 0) ON CONFLICT(ingredient_name) WHERE checked = 0 DO UPDATE SET quantity = quantity + excluded.quantity, updated_at = CURRENT_TIMESTAMP", normalizeIngredient(name), qty, unit);
+    await db.runAsync("INSERT INTO shopping_items (ingredient_name, quantity, unit, updated_at, deleted) VALUES (?, ?, ?, CURRENT_TIMESTAMP, 0) ON CONFLICT(ingredient_name) DO UPDATE SET quantity = quantity + excluded.quantity, checked = 0, deleted = 0, updated_at = CURRENT_TIMESTAMP", normalizeIngredient(name), qty, unit);
     await loadData();
   };
 
@@ -173,7 +176,7 @@ function AppContent() {
       const need = missingRecipeQuantity(item.qty, owned?.quantity ?? 0, owned?.unit ?? "", preferences.household_size, 2);
       if (need) {
         await db.runAsync(
-          "INSERT INTO shopping_items (ingredient_name, quantity, unit, updated_at, deleted) VALUES (?, ?, ?, CURRENT_TIMESTAMP, 0) ON CONFLICT(ingredient_name) WHERE checked = 0 DO UPDATE SET quantity = quantity + excluded.quantity, unit = excluded.unit, updated_at = CURRENT_TIMESTAMP",
+          "INSERT INTO shopping_items (ingredient_name, quantity, unit, updated_at, deleted) VALUES (?, ?, ?, CURRENT_TIMESTAMP, 0) ON CONFLICT(ingredient_name) DO UPDATE SET quantity = quantity + excluded.quantity, unit = excluded.unit, checked = 0, deleted = 0, updated_at = CURRENT_TIMESTAMP",
           normalized, need.quantity, need.unit
         );
       }
@@ -330,7 +333,7 @@ function AppContent() {
 
   const addMealToSelectedDay = async (recipe: Recipe) => {
     if (!planPickerDate) return;
-    await db.runAsync("INSERT INTO meal_plan (meal_date, meal_type, recipe_id, updated_at, deleted) VALUES (?, ?, ?, CURRENT_TIMESTAMP, 0)", planPickerDate, "شام", recipe.id);
+    await db.runAsync("INSERT INTO meal_plan (meal_date, meal_type, recipe_id, updated_at, deleted) VALUES (?, ?, ?, CURRENT_TIMESTAMP, 0) ON CONFLICT(meal_date, meal_type, recipe_id) DO UPDATE SET deleted = 0, updated_at = CURRENT_TIMESTAMP", planPickerDate, "شام", recipe.id);
     setPlanPickerDate(null);
     await loadData();
   };

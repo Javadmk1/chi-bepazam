@@ -221,7 +221,7 @@ function AppContent() {
       {pantry.filter(p => {
         const category = ingredientSeeds.find(i => i.name === p.ingredient_name)?.category ?? "";
         const status = getExpiryStatus(p.expires_at);
-        const categoryMatch = pantryFilter === "همه" ||
+        const categoryMatch = ["همه", "نزدیک انقضا", "منقضی‌شده"].includes(pantryFilter) ||
           (pantryFilter === "سبزیجات" && category === "سبزیجات") ||
           (pantryFilter === "پروتئین و لبنیات" && ["لبنیات", "گوشت و پروتئین", "لبنیات و پروتئین"].includes(category));
         const expiryMatch = pantryFilter === "نزدیک انقضا" ? status === "soon" :

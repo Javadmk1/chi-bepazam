@@ -31,8 +31,12 @@ jobs:
           distribution: temurin
           java-version: "17"
 
-      - name: Cache Gradle distributions and dependencies
-        uses: gradle/actions/setup-gradle@v4
+      # Install Gradle itself before entering the Android build. This bypasses
+      # the generated wrapper's hard-coded 10s distribution download timeout.
+      - name: Setup Gradle 8.14.3
+        uses: gradle/actions/setup-gradle@v6
+        with:
+          gradle-version: "8.14.3"
 
       - name: Install dependencies
         timeout-minutes: 10
@@ -64,20 +68,15 @@ jobs:
       - name: Diagnose Expo autolinking metadata
         run: node scripts/diagnose-expo-autolinking.mjs
 
-      - name: Increase Gradle wrapper download timeout
-        working-directory: android
+      - name: Verify installed Gradle version
         run: |
-          sed -i 's/networkTimeout=10000/networkTimeout=120000/' gradle/wrapper/gradle-wrapper.properties
-          grep -q 'networkTimeout=120000' gradle/wrapper/gradle-wrapper.properties || {
-            echo "Could not configure Gradle wrapper network timeout"
-            exit 1
-          }
-          cat gradle/wrapper/gradle-wrapper.properties
+          gradle --version
+          test "$(gradle --version | awk '/^Gradle / {print $2; exit}')" = "8.14.3"
 
       - name: Build installable debug APK
         timeout-minutes: 35
         working-directory: android
-        run: ./gradlew --no-daemon --stacktrace assembleDebug
+        run: gradle --no-daemon --stacktrace assembleDebug
 
       - name: Upload APK
         uses: actions/upload-artifact@v4

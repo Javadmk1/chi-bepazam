@@ -29,7 +29,8 @@ function AppContent() {
   const [newName, setNewName] = useState("");
   const [newQty, setNewQty] = useState("1");
   const [selected, setSelected] = useState<Recipe | null>(null);
-  const [filter, setFilter] = useState("همه");
+  const [pantryFilter, setPantryFilter] = useState("همه");
+  const [recipeFilter, setRecipeFilter] = useState("همه");
 
   const loadData = async () => {
     const p = await db.getAllAsync<PantryItem>("SELECT id, ingredient_name, quantity, unit FROM pantry WHERE deleted = 0 ORDER BY ingredient_name");
@@ -69,7 +70,7 @@ function AppContent() {
     return recipes.filter(r => {
       const q = query.trim();
       const textMatch = !q || r.title.includes(q) || r.tags.some(t => t.includes(q));
-      const filterMatch = filter === "همه" || (filter === "سریع" && r.timeMin <= 30) || (filter === "اقتصادی" && r.tags.includes("اقتصادی"));
+      const filterMatch = recipeFilter === "همه" || (recipeFilter === "سریع" && r.timeMin <= 30) || (recipeFilter === "اقتصادی" && r.tags.includes("اقتصادی"));
       return textMatch && filterMatch;
     });
   }, [query, filter]);
@@ -142,8 +143,8 @@ function AppContent() {
     <ScrollView contentContainerStyle={styles.page}>
       <Header title="انبار خانه" subtitle="مواد غذایی موجود در خانه" />
       <TextInput value={query} onChangeText={setQuery} placeholder="جستجو در مواد..." placeholderTextColor={C.muted} style={styles.search}/>
-      <View style={styles.filterRow}>{["همه", "سبزیجات", "لبنیات و پروتئین"].map(x => <Pressable key={x} onPress={() => setFilter(x)} style={[styles.chip, filter === x && styles.chipActive]}><Text style={[styles.chipText, filter === x && styles.chipTextActive]}>{x}</Text></Pressable>)}</View>
-      {pantry.filter(p => p.ingredient_name.includes(query) && (filter === "همه" || ingredientSeeds.find(i => i.name === p.ingredient_name)?.category === filter)).map(item => (
+      <View style={styles.filterRow}>{["همه", "سبزیجات", "لبنیات و پروتئین"].map(x => <Pressable key={x} onPress={() => setPantryFilter(x)} style={[styles.chip, pantryFilter === x && styles.chipActive]}><Text style={[styles.chipText, pantryFilter === x && styles.chipTextActive]}>{x}</Text></Pressable>)}</View>
+      {pantry.filter(p => p.ingredient_name.includes(query) && (pantryFilter === "همه" || ingredientSeeds.find(i => i.name === p.ingredient_name)?.category === pantryFilter)).map(item => (
         <View key={item.id} style={styles.listRow}><View style={styles.ingredientIcon}><Text>🥬</Text></View><View style={styles.listMain}><Text style={styles.listTitle}>{item.ingredient_name}</Text><Text style={styles.muted}>{item.quantity} {item.unit}</Text></View><Pressable onPress={() => removePantry(item)} hitSlop={10}><Ionicons name="trash-outline" size={19} color={C.red}/></Pressable></View>
       ))}
       {pantry.length === 0 ? <View style={styles.empty}><Text style={styles.emptyEmoji}>🧺</Text><Text style={styles.emptyTitle}>انبارت هنوز خالیه</Text><Text style={styles.muted}>چند ماده پرکاربرد اضافه کن تا پیشنهادهای بهتری بگیری.</Text><Pressable style={styles.greenButton} onPress={addQuickItems}><Text style={styles.greenButtonText}>افزودن مواد پرکاربرد</Text></Pressable></View> : null}
@@ -155,7 +156,7 @@ function AppContent() {
     <ScrollView contentContainerStyle={styles.page}>
       <Header title="پیشنهاد غذا" subtitle="غذای مناسب با شرایط تو" />
       <TextInput value={query} onChangeText={setQuery} placeholder="نام غذا یا نوع آن را جستجو کن..." placeholderTextColor={C.muted} style={styles.search}/>
-      <View style={styles.filterRow}>{["همه", "سریع", "اقتصادی"].map(x => <Pressable key={x} onPress={() => setFilter(x)} style={[styles.chip, filter === x && styles.chipActive]}><Text style={[styles.chipText, filter === x && styles.chipTextActive]}>{x}</Text></Pressable>)}</View>
+      <View style={styles.filterRow}>{["همه", "سریع", "اقتصادی"].map(x => <Pressable key={x} onPress={() => setRecipeFilter(x)} style={[styles.chip, recipeFilter === x && styles.chipActive]}><Text style={[styles.chipText, recipeFilter === x && styles.chipActive]}>{x}</Text></Pressable>)}</View>
       {matchingRecipes.map(r => <RecipeCard key={r.id} recipe={r}/>)}
       {matchingRecipes.length === 0 ? <Text style={styles.muted}>غذایی پیدا نشد؛ عبارت دیگری را امتحان کن.</Text> : null}
     </ScrollView>

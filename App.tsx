@@ -267,14 +267,27 @@ function AppContent() {
         );
       })}
       <Pressable style={styles.greenButton} onPress={async () => {
+        const needs = new Map<string, { quantity: number; unit: string }>();
         for (const meal of mealPlan) {
           const recipe = recipes.find(item => item.id === meal.recipe_id);
-          if (recipe) for (const ingredient of recipe.ingredients) {
+          if (!recipe) continue;
+          for (const ingredient of recipe.ingredients) {
             const normalized = normalizeIngredient(ingredient.name);
-            const owned = pantry.find(item => normalizeIngredient(item.ingredient_name) === normalized);
-            const need = missingRecipeQuantity(ingredient.qty, owned?.quantity ?? 0, owned?.unit ?? "", preferences.household_size, 2);
-            if (need) await db.runAsync("INSERT INTO shopping_items (ingredient_name, quantity, unit) VALUES (?, ?, ?) ON CONFLICT(ingredient_name) WHERE checked = 0 DO UPDATE SET quantity = quantity + excluded.quantity, unit = excluded.unit", normalized, need.quantity, need.unit);
+            const parsed = missingRecipeQuantity(ingredient.qty, 0, "", preferences.household_size, 2);
+            if (!parsed) continue;
+            const current = needs.get(normalized);
+            if (!current) needs.set(normalized, { quantity: parsed.quantity, unit: parsed.unit });
+            else if (current.unit === parsed.unit) current.quantity += parsed.quantity;
           }
+        }
+        for (const [name, need] of needs) {
+          const stock = pantry.find(item => normalizeIngredient(item.ingredient_name) === name);
+          const available = stock?.unit === need.unit ? stock.quantity : 0;
+          const missing = Math.max(0, Math.round((need.quantity - available) * 100) / 100);
+          if (missing > 0) await db.runAsync(
+            "INSERT INTO shopping_items (ingredient_name, quantity, unit) VALUES (?, ?, ?) ON CONFLICT(ingredient_name) WHERE checked = 0 DO UPDATE SET quantity = quantity + excluded.quantity, unit = excluded.unit",
+            name, missing, need.unit
+          );
         }
         await loadData();
         setTab("لیست خرید");

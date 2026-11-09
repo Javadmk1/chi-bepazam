@@ -156,7 +156,7 @@ function AppContent() {
     <ScrollView contentContainerStyle={styles.page}>
       <Header title="پیشنهاد غذا" subtitle="غذای مناسب با شرایط تو" />
       <TextInput value={query} onChangeText={setQuery} placeholder="نام غذا یا نوع آن را جستجو کن..." placeholderTextColor={C.muted} style={styles.search}/>
-      <View style={styles.filterRow}>{["همه", "سریع", "اقتصادی"].map(x => <Pressable key={x} onPress={() => setRecipeFilter(x)} style={[styles.chip, recipeFilter === x && styles.chipActive]}><Text style={[styles.chipText, recipeFilter === x && styles.chipActive]}>{x}</Text></Pressable>)}</View>
+      <View style={styles.filterRow}>{["همه", "سریع", "اقتصادی"].map(x => <Pressable key={x} onPress={() => setRecipeFilter(x)} style={[styles.chip, recipeFilter === x && styles.chipActive]}><Text style={[styles.chipText, recipeFilter === x && styles.chipTextActive]}>{x}</Text></Pressable>)}</View>
       {matchingRecipes.map(r => <RecipeCard key={r.id} recipe={r}/>)}
       {matchingRecipes.length === 0 ? <Text style={styles.muted}>غذایی پیدا نشد؛ عبارت دیگری را امتحان کن.</Text> : null}
     </ScrollView>

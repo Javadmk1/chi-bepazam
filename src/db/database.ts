@@ -32,14 +32,6 @@ export async function initializeDatabase(db: SQLiteDatabase) {
       deleted INTEGER NOT NULL DEFAULT 0,
       cloud_id TEXT
     );
-    UPDATE shopping_items
-      SET quantity = (SELECT SUM(x.quantity) FROM shopping_items x WHERE x.ingredient_name = shopping_items.ingredient_name),
-          checked = (SELECT MIN(x.checked) FROM shopping_items x WHERE x.ingredient_name = shopping_items.ingredient_name),
-          deleted = (SELECT MIN(x.deleted) FROM shopping_items x WHERE x.ingredient_name = shopping_items.ingredient_name)
-      WHERE id IN (SELECT MIN(id) FROM shopping_items GROUP BY ingredient_name);
-    DELETE FROM shopping_items WHERE id NOT IN (SELECT MIN(id) FROM shopping_items GROUP BY ingredient_name);
-    DROP INDEX IF EXISTS idx_shopping_open_item;
-    CREATE UNIQUE INDEX IF NOT EXISTS idx_shopping_item_name ON shopping_items (ingredient_name);
     CREATE TABLE IF NOT EXISTS user_preferences (
       id INTEGER PRIMARY KEY CHECK (id = 1),
       diet TEXT NOT NULL DEFAULT 'همه',
@@ -77,6 +69,14 @@ export async function initializeDatabase(db: SQLiteDatabase) {
   await ensureColumn("meal_plan", "deleted", "INTEGER NOT NULL DEFAULT 0");
   await ensureColumn("meal_plan", "cloud_id", "TEXT");
   await db.execAsync(`
+    UPDATE shopping_items
+      SET quantity = (SELECT SUM(x.quantity) FROM shopping_items x WHERE x.ingredient_name = shopping_items.ingredient_name),
+          checked = (SELECT MIN(x.checked) FROM shopping_items x WHERE x.ingredient_name = shopping_items.ingredient_name),
+          deleted = (SELECT MIN(x.deleted) FROM shopping_items x WHERE x.ingredient_name = shopping_items.ingredient_name)
+      WHERE id IN (SELECT MIN(id) FROM shopping_items GROUP BY ingredient_name);
+    DELETE FROM shopping_items WHERE id NOT IN (SELECT MIN(id) FROM shopping_items GROUP BY ingredient_name);
+    DROP INDEX IF EXISTS idx_shopping_open_item;
+    CREATE UNIQUE INDEX IF NOT EXISTS idx_shopping_item_name ON shopping_items (ingredient_name);
     UPDATE pantry SET updated_at = CURRENT_TIMESTAMP WHERE updated_at IS NULL;
     UPDATE shopping_items SET updated_at = CURRENT_TIMESTAMP WHERE updated_at IS NULL;
     UPDATE user_preferences SET updated_at = CURRENT_TIMESTAMP WHERE updated_at IS NULL;

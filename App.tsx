@@ -230,6 +230,7 @@ function AppContent() {
       <View style={styles.recipeInfo}>
         <Text style={styles.recipeTitle}>{recipe.title}</Text>
         <Text style={styles.muted}>{recipe.subtitle}</Text>
+        <View style={styles.recipeTags}>{recipe.tags.slice(0, 2).map(tag => <View key={tag} style={styles.recipeTag}><Text style={styles.recipeTagText}>{tag}</Text></View>)}</View>
         <View style={styles.metaRow}><Ionicons name="time-outline" size={14} color={C.gold}/><Text style={styles.metaText}>{recipe.timeMin} دقیقه</Text><Ionicons name="flame-outline" size={14} color={C.gold}/><Text style={styles.metaText}>{recipe.calories} کالری</Text></View>
       </View>
       <Ionicons name="chevron-back" size={18} color={C.muted}/>
@@ -538,6 +539,7 @@ function AppContent() {
             <Pressable onPress={() => setSelected(null)} style={styles.back}><Ionicons name="arrow-forward" size={21} color={C.text}/><Text style={styles.backText}>بازگشت</Text></Pressable>
             <View style={styles.detailHero}><FoodArt recipe={selected} large/></View>
             <Text style={styles.detailTitle}>{selected.title}</Text><Text style={styles.muted}>{selected.subtitle}</Text>
+            <View style={styles.recipeTags}>{selected.tags.map(tag => <View key={tag} style={styles.recipeTag}><Text style={styles.recipeTagText}>{tag}</Text></View>)}</View>
             <View style={styles.metaPanel}><Text style={styles.metaText}>⏱ {selected.timeMin} دقیقه</Text><Text style={styles.metaText}>🔥 {selected.calories} کالری</Text><Text style={styles.metaText}>⭐ {selected.rating}</Text></View>
             <SectionTitle title="مواد لازم"/>
             {selected.ingredients.map(x => <View key={x.name} style={styles.ingredientLine}><Text style={styles.listTitle}>{x.name}</Text><Text style={styles.muted}>{scaledRecipeQuantity(x.qty, preferences.household_size, 2)}</Text></View>)}
@@ -625,7 +627,10 @@ const styles = StyleSheet.create({
   foodEmoji: { fontSize: 38 },
   rating: { position: "absolute", bottom: 4, left: 5, flexDirection: "row", alignItems: "center", gap: 2 },
   ratingText: { color: C.text, fontSize: 10 },
-  recipeInfo: { flex: 1, gap: 5, alignItems: "flex-end" },
+  recipeInfo: { flex: 1, gap: 6, alignItems: "flex-end" },
+  recipeTags: { flexDirection: "row-reverse", flexWrap: "wrap", gap: 5 },
+  recipeTag: { backgroundColor: "#24271F", borderWidth: 1, borderColor: "#514326", borderRadius: 20, paddingHorizontal: 8, paddingVertical: 3 },
+  recipeTagText: { color: C.gold, fontSize: 9, fontWeight: "700" },
   recipeTitle: { color: C.text, fontSize: 15, fontWeight: "800", textAlign: "right" },
   metaRow: { flexDirection: "row-reverse", alignItems: "center", gap: 5 },
   metaText: { color: C.muted, fontSize: 11 },

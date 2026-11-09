@@ -96,6 +96,15 @@ function AppContent() {
     setModal(true);
   };
 
+  const adjustPantry = async (item: PantryItem, direction: -1 | 1) => {
+    const step = item.unit === "گرم" || item.unit === "میلی‌لیتر" ? 50 : 1;
+    await db.runAsync(
+      "UPDATE pantry SET quantity = MAX(0, quantity + ?), updated_at = CURRENT_TIMESTAMP WHERE id = ?",
+      direction * step, item.id
+    );
+    await loadData();
+  };
+
   const expiringItems = pantry.filter(item => getExpiryStatus(item.expires_at) === "soon");
   const expiredItems = pantry.filter(item => getExpiryStatus(item.expires_at) === "expired");
 
@@ -208,9 +217,18 @@ function AppContent() {
       <Header title="انبار خانه" subtitle="مواد غذایی موجود در خانه" />
       {expiredItems.length > 0 || expiringItems.length > 0 ? <View style={[styles.expiryNotice, expiredItems.length > 0 && styles.expiryDanger]}><Ionicons name="alert-circle" size={20} color={expiredItems.length > 0 ? C.red : C.gold}/><Text style={styles.expiryNoticeText}>{expiredItems.length > 0 ? `${expiredItems.length} ماده منقضی‌شده` : ""}{expiredItems.length > 0 && expiringItems.length > 0 ? " · " : ""}{expiringItems.length > 0 ? `${expiringItems.length} ماده با انقضای حداکثر ۷ روز آینده` : ""}</Text></View> : null}
       <TextInput value={query} onChangeText={setQuery} placeholder="جستجو در مواد..." placeholderTextColor={C.muted} style={styles.search}/>
-      <View style={styles.filterRow}>{["همه", "سبزیجات", "لبنیات و پروتئین"].map(x => <Pressable key={x} onPress={() => setPantryFilter(x)} style={[styles.chip, pantryFilter === x && styles.chipActive]}><Text style={[styles.chipText, pantryFilter === x && styles.chipTextActive]}>{x}</Text></Pressable>)}</View>
-      {pantry.filter(p => p.ingredient_name.includes(query) && (pantryFilter === "همه" || ingredientSeeds.find(i => i.name === p.ingredient_name)?.category === pantryFilter)).map(item => (
-        <View key={item.id} style={styles.listRow}><View style={styles.ingredientIcon}><Text>🥬</Text></View><View style={styles.listMain}><Text style={styles.listTitle}>{item.ingredient_name}</Text><Text style={styles.muted}>{item.quantity} {item.unit}</Text><Text style={styles.muted}>{item.expires_at ? `انقضا: ${item.expires_at} · ${expiryLabel(item.expires_at)}` : "تاریخ انقضا ثبت نشده"}</Text></View><Pressable onPress={() => openPantryEditor(item)} hitSlop={8}><Ionicons name="create-outline" size={19} color={C.gold}/></Pressable><Pressable onPress={() => db.runAsync("UPDATE pantry SET quantity = MAX(0, quantity - 1), updated_at = CURRENT_TIMESTAMP WHERE id = ?", item.id).then(loadData)} hitSlop={8}><Ionicons name="remove-circle-outline" size={20} color={C.gold}/></Pressable><Pressable onPress={() => db.runAsync("UPDATE pantry SET quantity = quantity + 1, updated_at = CURRENT_TIMESTAMP WHERE id = ?", item.id).then(loadData)} hitSlop={8}><Ionicons name="add-circle-outline" size={20} color={C.green2}/></Pressable><Pressable onPress={() => removePantry(item)} hitSlop={10}><Ionicons name="trash-outline" size={19} color={C.red}/></Pressable></View>
+      <View style={styles.filterRow}>{["همه", "سبزیجات", "پروتئین و لبنیات", "نزدیک انقضا", "منقضی‌شده"].map(x => <Pressable key={x} onPress={() => setPantryFilter(x)} style={[styles.chip, pantryFilter === x && styles.chipActive]}><Text style={[styles.chipText, pantryFilter === x && styles.chipTextActive]}>{x}</Text></Pressable>)}</View>
+      {pantry.filter(p => {
+        const category = ingredientSeeds.find(i => i.name === p.ingredient_name)?.category ?? "";
+        const status = getExpiryStatus(p.expires_at);
+        const categoryMatch = pantryFilter === "همه" ||
+          (pantryFilter === "سبزیجات" && category === "سبزیجات") ||
+          (pantryFilter === "پروتئین و لبنیات" && ["لبنیات", "گوشت و پروتئین", "لبنیات و پروتئین"].includes(category));
+        const expiryMatch = pantryFilter === "نزدیک انقضا" ? status === "soon" :
+          pantryFilter === "منقضی‌شده" ? status === "expired" : true;
+        return p.ingredient_name.includes(query) && categoryMatch && expiryMatch;
+      }).map(item => (
+        <View key={item.id} style={styles.listRow}><View style={styles.ingredientIcon}><Text>🥬</Text></View><View style={styles.listMain}><Text style={styles.listTitle}>{item.ingredient_name}</Text><Text style={styles.muted}>{item.quantity} {item.unit}</Text><Text style={styles.muted}>{item.expires_at ? `انقضا: ${item.expires_at} · ${expiryLabel(item.expires_at)}` : "تاریخ انقضا ثبت نشده"}</Text></View><Pressable onPress={() => openPantryEditor(item)} hitSlop={8}><Ionicons name="create-outline" size={19} color={C.gold}/></Pressable><Pressable onPress={() => adjustPantry(item, -1)} hitSlop={8}><Ionicons name="remove-circle-outline" size={20} color={C.gold}/></Pressable><Pressable onPress={() => adjustPantry(item, 1)} hitSlop={8}><Ionicons name="add-circle-outline" size={20} color={C.green2}/></Pressable><Pressable onPress={() => removePantry(item)} hitSlop={10}><Ionicons name="trash-outline" size={19} color={C.red}/></Pressable></View>
       ))}
       {pantry.length === 0 ? <View style={styles.empty}><Text style={styles.emptyEmoji}>🧺</Text><Text style={styles.emptyTitle}>انبارت هنوز خالیه</Text><Text style={styles.muted}>چند ماده پرکاربرد اضافه کن تا پیشنهادهای بهتری بگیری.</Text><Pressable style={styles.greenButton} onPress={addQuickItems}><Text style={styles.greenButtonText}>افزودن مواد پرکاربرد</Text></Pressable></View> : null}
       <Pressable style={styles.greenButton} onPress={() => { setEditingPantry(null); setNewName(""); setNewQty("1"); setNewExpiry(""); setModal(true); }}><Ionicons name="add" size={19} color={C.white}/><Text style={styles.greenButtonText}>افزودن ماده غذایی</Text></Pressable>

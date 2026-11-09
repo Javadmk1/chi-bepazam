@@ -189,7 +189,10 @@ function AppContent() {
         <Text style={styles.brand}>{title}</Text>
         {subtitle ? <Text style={styles.muted}>{subtitle}</Text> : null}
       </View>
-      <View style={styles.logo}><Ionicons name="restaurant" size={22} color={C.gold} /></View>
+      <View style={{flexDirection:"row", alignItems:"center", gap:9}}>
+        <Pressable style={styles.headerAction} accessibilityLabel="تنظیمات" onPress={() => { setSelected(null); setTab("تنظیمات"); }}><Ionicons name="settings-outline" size={19} color={C.gold}/></Pressable>
+        <View style={styles.logo}><Ionicons name="restaurant" size={22} color={C.gold} /></View>
+      </View>
     </View>
   );
 
@@ -468,8 +471,7 @@ function AppContent() {
     { name: "انبار", icon: "basket-outline" },
     { name: "پیشنهادها", icon: "restaurant-outline" },
     { name: "لیست خرید", icon: "cart-outline" },
-    { name: "برنامه", icon: "calendar-outline" },
-    { name: "تنظیمات", icon: "settings-outline" }
+    { name: "برنامه", icon: "calendar-outline" }
   ] as const;
 
   return (
@@ -546,6 +548,7 @@ const styles = StyleSheet.create({
   brand: { color: C.gold, fontSize: 25, fontWeight: "900", textAlign: "right" },
   muted: { color: C.muted, fontSize: 12, textAlign: "right", lineHeight: 20 },
   logo: { width: 43, height: 43, borderRadius: 15, borderWidth: 1, borderColor: C.goldSoft, alignItems: "center", justifyContent: "center", backgroundColor: C.panel },
+  headerAction: { width: 39, height: 39, borderRadius: 13, borderWidth: 1, borderColor: C.line, alignItems: "center", justifyContent: "center", backgroundColor: C.panel },
   hero: { backgroundColor: "#201B10", borderColor: "#72571D", borderWidth: 1, borderRadius: 22, padding: 18, gap: 10 },
   heroTop: { flexDirection: "row-reverse", justifyContent: "space-between", alignItems: "center" },
   eyebrow: { color: C.gold, fontSize: 12, fontWeight: "700" },

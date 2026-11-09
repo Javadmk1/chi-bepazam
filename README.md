@@ -58,8 +58,9 @@ npx expo start
 
 ## پیکربندی Supabase
 1. فایل `.env.example` را به `.env` کپی کنید.
-2. مقدار `EXPO_PUBLIC_SUPABASE_URL` و کلید عمومی `EXPO_PUBLIC_SUPABASE_ANON_KEY` را از Project Settings وارد کنید.
-3. فایل‌های SQL پوشه `supabase/migrations` را به ترتیب در SQL Editor پروژه اجرا کنید.
-4. در Authentication، ورود با ایمیل و قالب ایمیل OTP را فعال کنید.
+2. مقدار `EXPO_PUBLIC_SUPABASE_URL` و کلید عمومی `EXPO_PUBLIC_SUPABASE_ANON_KEY` را از Project Settings بگیرید.
+3. برای APK ساخته‌شده از GitHub Actions، این دو مقدار را در مخزن GitHub در Settings → Secrets and variables → Actions به‌عنوان Repository secrets با همین نام‌ها ثبت کنید.
+4. فایل‌های SQL پوشه `supabase/migrations` را به ترتیب در SQL Editor پروژه اجرا کنید.
+5. در Authentication، ورود با ایمیل و قالب ایمیل OTP را فعال کنید.
 
 **هشدار امنیتی:** کلید `service_role` را هرگز در اپ موبایل یا متغیرهای `EXPO_PUBLIC_*` قرار ندهید. نشست کاربر روی دستگاه با SecureStore نگهداری می‌شود.

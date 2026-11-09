@@ -12,6 +12,7 @@ import { ingredientSeeds, normalizeIngredient } from "./src/data/ingredients";
 import { rankRecipes } from "./src/engine/matcher";
 import { missingRecipeQuantity, scaledRecipeQuantity } from "./src/data/recipe-quantity";
 import { expiryLabel, getExpiryStatus } from "./src/data/expiry";
+import { supabase, supabaseConfigured } from "./src/lib/supabase";
 
 type PantryItem = { id: number; ingredient_name: string; quantity: number; unit: string; expires_at?: string | null };
 type UserPreferences = { diet: string; allergies_json: string; household_size: number; weekly_budget: number };
@@ -50,6 +51,11 @@ function AppContent() {
   const [recipeFilter, setRecipeFilter] = useState("همه");
   const [preferences, setPreferences] = useState<UserPreferences>({ diet: "همه", allergies_json: "[]", household_size: 2, weekly_budget: 0 });
   const [allergyInput, setAllergyInput] = useState("");
+  const [cloudEmail, setCloudEmail] = useState("");
+  const [cloudCode, setCloudCode] = useState("");
+  const [cloudCodeSent, setCloudCodeSent] = useState(false);
+  const [cloudUserEmail, setCloudUserEmail] = useState<string | null>(null);
+  const [cloudBusy, setCloudBusy] = useState(false);
 
   const loadData = async () => {
     const p = await db.getAllAsync<PantryItem>("SELECT id, ingredient_name, quantity, unit, expires_at FROM pantry WHERE deleted = 0 ORDER BY ingredient_name");
@@ -63,6 +69,15 @@ function AppContent() {
   };
 
   useEffect(() => { loadData().catch(() => Alert.alert("خطا", "خواندن اطلاعات محلی انجام نشد.")); }, []);
+
+  useEffect(() => {
+    if (!supabase) return;
+    supabase.auth.getSession().then(({ data }) => setCloudUserEmail(data.session?.user.email ?? null));
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      setCloudUserEmail(session?.user.email ?? null);
+    });
+    return () => subscription.unsubscribe();
+  }, []);
 
   const addPantry = async (name: string, qty = 1, expiresAt: string | null = null) => {
     const normalized = normalizeIngredient(name);
@@ -374,10 +389,57 @@ function AppContent() {
     setPreferences(next);
   };
 
+  const requestCloudCode = async () => {
+    if (!supabase) {
+      Alert.alert("اتصال آماده نیست", "آدرس پروژه و کلید عمومی Supabase هنوز در تنظیمات ساخت وارد نشده‌اند.");
+      return;
+    }
+    const email = cloudEmail.trim().toLowerCase();
+    if (!/^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/.test(email)) {
+      Alert.alert("ایمیل نامعتبر", "یک نشانی ایمیل معتبر وارد کن.");
+      return;
+    }
+    setCloudBusy(true);
+    const { error } = await supabase.auth.signInWithOtp({ email, options: { shouldCreateUser: true } });
+    setCloudBusy(false);
+    if (error) Alert.alert("ارسال کد ناموفق بود", error.message);
+    else { setCloudCodeSent(true); Alert.alert("کد ارسال شد", "کد ورود را از ایمیلت بردار و اینجا وارد کن."); }
+  };
+
+  const verifyCloudCode = async () => {
+    if (!supabase) return;
+    const token = cloudCode.trim().replace(/\\s/g, "");
+    if (!/^\\d{6}$/.test(token)) { Alert.alert("کد نامعتبر", "کد شش‌رقمی ایمیل را وارد کن."); return; }
+    setCloudBusy(true);
+    const { data, error } = await supabase.auth.verifyOtp({ email: cloudEmail.trim().toLowerCase(), token, type: "email" });
+    setCloudBusy(false);
+    if (error) Alert.alert("ورود ناموفق بود", error.message);
+    else {
+      setCloudUserEmail(data.user?.email ?? cloudEmail.trim());
+      setCloudCodeSent(false);
+      setCloudCode("");
+      Alert.alert("ورود موفق", "حساب کاربری متصل شد. اطلاعات محلی هنوز به فضای ابری منتقل نشده‌اند.");
+    }
+  };
+
+  const signOutCloud = async () => {
+    if (!supabase) return;
+    const { error } = await supabase.auth.signOut();
+    if (error) Alert.alert("خطا", error.message);
+    else { setCloudUserEmail(null); setCloudCodeSent(false); }
+  };
+
   const Settings = () => (
     <ScrollView contentContainerStyle={styles.page}>
       <Header title="تنظیمات" subtitle="ترجیحات روی همین دستگاه ذخیره می‌شوند" />
-      <View style={styles.profile}><Ionicons name="person-circle-outline" size={48} color={C.gold}/><View style={{flex:1}}><Text style={styles.listTitle}>حساب مهمان</Text><Text style={styles.muted}>بدون نیاز به ثبت‌نام</Text></View></View>
+      <View style={styles.profile}><Ionicons name="person-circle-outline" size={42} color={C.gold}/><View style={{flex:1}}><Text style={styles.listTitle}>{cloudUserEmail ? "حساب متصل" : "حساب مهمان"}</Text><Text style={styles.muted}>{cloudUserEmail ?? "اطلاعات فعلاً فقط روی همین دستگاه ذخیره می‌شوند."}</Text></View></View>
+      <SectionTitle title="حساب ابری و پشتیبان‌گیری"/>
+      {!supabaseConfigured ? <View style={styles.tip}><Ionicons name="cloud-offline-outline" color={C.gold} size={20}/><Text style={styles.tipText}>اتصال ابری هنوز پیکربندی نشده؛ متغیرهای EXPO_PUBLIC_SUPABASE_URL و EXPO_PUBLIC_SUPABASE_ANON_KEY لازم‌اند.</Text></View> : null}
+      {cloudUserEmail ? <Pressable style={styles.settingRow} onPress={signOutCloud}><Ionicons name="log-out-outline" size={20} color={C.gold}/><Text style={styles.listTitle}>خروج از حساب ابری</Text></Pressable> : <>
+        <TextInput value={cloudEmail} onChangeText={setCloudEmail} autoCapitalize="none" keyboardType="email-address" placeholder="ایمیل برای ورود" placeholderTextColor={C.muted} style={styles.input}/>
+        {cloudCodeSent ? <><TextInput value={cloudCode} onChangeText={setCloudCode} keyboardType="number-pad" maxLength={6} placeholder="کد شش‌رقمی ایمیل" placeholderTextColor={C.muted} style={styles.input}/><Pressable disabled={cloudBusy} style={[styles.greenButton, cloudBusy && {opacity:0.5}]} onPress={verifyCloudCode}><Text style={styles.greenButtonText}>{cloudBusy ? "در حال بررسی..." : "تأیید کد و ورود"}</Text></Pressable></> : <Pressable disabled={cloudBusy || !supabaseConfigured} style={[styles.greenButton, (!supabaseConfigured || cloudBusy) && {opacity:0.5}]} onPress={requestCloudCode}><Text style={styles.greenButtonText}>{cloudBusy ? "در حال ارسال..." : "ارسال کد ورود به ایمیل"}</Text></Pressable>}
+      </>}
+      <View style={styles.tip}><Ionicons name="shield-checkmark-outline" color={C.gold} size={20}/><Text style={styles.tipText}>نشست ورود با SecureStore دستگاه نگهداری می‌شود. کلید Service Role هرگز نباید در برنامه موبایل قرار بگیرد. انتقال و همگام‌سازی داده‌ها در مرحله بعد فعال می‌شود.</Text></View>
       <SectionTitle title="الگوی غذایی"/>
       <Text style={styles.muted}>غذاهای پیشنهادی براساس این انتخاب فیلتر می‌شوند.</Text>
       <View style={styles.filterRow}>{["همه", "گیاهی"].map(option => <Pressable key={option} onPress={() => savePreferences({...preferences, diet: option})} style={[styles.chip, preferences.diet === option && styles.chipActive]}><Text style={[styles.chipText, preferences.diet === option && styles.chipTextActive]}>{option}</Text></Pressable>)}</View>
@@ -396,7 +458,7 @@ function AppContent() {
         <Pressable style={styles.chip} onPress={() => savePreferences({...preferences, household_size: Math.min(20, preferences.household_size + 1)})}><Text style={styles.chipText}>+</Text></Pressable>
       </View>
       <View style={styles.tip}><Ionicons name="information-circle-outline" color={C.gold} size={20}/><Text style={styles.tipText}>فیلتر حساسیت فقط مواد ثبت‌شده در دستورها را بررسی می‌کند؛ آلودگی متقاطع یا مواد اعلام‌نشده را پوشش نمی‌دهد. در حساسیت شدید، صرفاً به این فیلتر تکیه نکن.</Text></View>
-      <Pressable style={styles.settingRow} onPress={() => Alert.alert("همگام‌سازی", "اتصال Supabase هنوز پیاده‌سازی نشده است.")}><Ionicons name="cloud-outline" size={20} color={C.gold}/><Text style={styles.listTitle}>پشتیبان‌گیری و همگام‌سازی</Text></Pressable>
+
       <Pressable style={styles.settingRow} onPress={() => Alert.alert("چی بپزم؟", "نسخه آزمایشی محلی") }><Ionicons name="information-circle-outline" size={20} color={C.gold}/><Text style={styles.listTitle}>درباره برنامه</Text></Pressable>
     </ScrollView>
   );

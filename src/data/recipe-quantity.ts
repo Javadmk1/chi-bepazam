@@ -13,7 +13,7 @@ export function parseRecipeQuantity(raw: string): ParsedQuantity {
   const fractions: Record<string, number> = { "نصف": 0.5, "یک‌چهارم": 0.25, "ربع": 0.25, "سه‌چهارم": 0.75 };
   const fraction = Object.entries(fractions).find(([word]) => value.startsWith(word));
   const match = value.match(/^(\d+(?:\.\d+)?)\s*(.*)$/);
-  const amount = fraction ? fraction[1] : match ? Number(match[1]) : NaN;
+  const amount = fraction ? Number(fraction[1]) : match ? Number(match[1]) : NaN;
   const rest = fraction ? value.slice(fraction[0].length).trim() : match?.[2]?.trim() ?? "";
   if (!Number.isFinite(amount) || amount <= 0) return null;
   let unit = rest.replace(/^عدد\s*/, "عدد").trim();

@@ -46,6 +46,11 @@ export async function initializeDatabase(db: SQLiteDatabase) {
     );
   `);
 
+  const pantryColumns = await db.getAllAsync<{ name: string }>("PRAGMA table_info(pantry)");
+  if (!pantryColumns.some(column => column.name === "expires_at")) {
+    await db.execAsync("ALTER TABLE pantry ADD COLUMN expires_at TEXT");
+  }
+
   const statement = await db.prepareAsync(
     "INSERT OR IGNORE INTO ingredients (canonical_name, category, base_unit, aliases_json) VALUES ($name, $category, $unit, $aliases)"
   );

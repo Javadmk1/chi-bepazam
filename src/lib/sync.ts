@@ -37,7 +37,7 @@ async function syncEntity(
       continue;
     }
 
-    if (time(row.updated_at) > time(remoteRow.updated_at)) {
+    if (time(row.updated_at) >= time(remoteRow.updated_at)) {
       const payload = { ...toRemote(row), user_id: userId };
       const { error: updateError } = await client.from(remoteTable).update(payload).eq("id", remoteRow.id);
       if (updateError) throw updateError;

@@ -12,6 +12,9 @@ on:
 jobs:
   android-debug-apk:
     runs-on: ubuntu-latest
+    env:
+      EXPO_PUBLIC_SUPABASE_URL: ${{ secrets.EXPO_PUBLIC_SUPABASE_URL }}
+      EXPO_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.EXPO_PUBLIC_SUPABASE_ANON_KEY }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -32,6 +35,14 @@ jobs:
 
       - name: Verify Expo native dependency versions
         run: npx expo install --check
+
+      - name: Check Supabase build configuration
+        run: |
+          if [ -z "$EXPO_PUBLIC_SUPABASE_URL" ] || [ -z "$EXPO_PUBLIC_SUPABASE_ANON_KEY" ]; then
+            echo "::warning::Supabase secrets are not configured; app will run in offline-only mode."
+          else
+            echo "Supabase public client configuration is present."
+          fi
 
       - name: Fetch openly licensed recipe photos
         run: node scripts/fetch-recipe-images.mjs

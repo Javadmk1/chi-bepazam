@@ -13,4 +13,5 @@ jobs:
         with:
           node-version: 20
       - run: npm install
+      - run: node scripts/validate-catalog.mjs
       - run: npx tsc --noEmit

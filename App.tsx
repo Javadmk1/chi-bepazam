@@ -118,6 +118,11 @@ function AppContent() {
     await loadData();
   };
 
+  const removeShopping = async (item: ShoppingItem) => {
+    await db.runAsync("DELETE FROM shopping_items WHERE id = ?", item.id);
+    await loadData();
+  };
+
   const removePantry = async (item: PantryItem) => {
     await db.runAsync("UPDATE pantry SET deleted = 1, updated_at = CURRENT_TIMESTAMP WHERE id = ?", item.id);
     await loadData();
@@ -249,7 +254,7 @@ function AppContent() {
     <ScrollView contentContainerStyle={styles.page}>
       <Header title="لیست خرید" subtitle="چیزهایی که باید تهیه کنی" />
       <View style={styles.summary}><Text style={styles.summaryNumber}>{shopping.filter(x => !x.checked).length}</Text><Text style={styles.summaryText}>مورد برای خرید باقی مانده</Text></View>
-      {shopping.map(item => <Pressable key={item.id} onPress={() => toggleShopping(item)} style={styles.listRow}><Ionicons name={item.checked ? "checkbox" : "square-outline"} size={22} color={item.checked ? C.green2 : C.muted}/><View style={styles.listMain}><Text style={[styles.listTitle, !!item.checked && styles.checkedText]}>{item.ingredient_name}</Text><Text style={styles.muted}>{item.quantity} {item.unit}</Text></View></Pressable>)}
+      {shopping.map(item => <View key={item.id} style={styles.listRow}><Pressable onPress={() => toggleShopping(item)} style={{ flex: 1, flexDirection: "row-reverse", alignItems: "center", gap: 12 }}><Ionicons name={item.checked ? "checkbox" : "square-outline"} size={22} color={item.checked ? C.green2 : C.muted}/><View style={styles.listMain}><Text style={[styles.listTitle, !!item.checked && styles.checkedText]}>{item.ingredient_name}</Text><Text style={styles.muted}>{item.quantity} {item.unit}</Text></View></Pressable><Pressable onPress={() => removeShopping(item)} hitSlop={8}><Ionicons name="trash-outline" size={18} color={C.red}/></Pressable></View>)}
       {shopping.some(item => item.checked) ? <Pressable style={styles.greenButton} onPress={async () => {
         const bought = shopping.filter(item => item.checked);
         const transferred: number[] = [];

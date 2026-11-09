@@ -85,7 +85,7 @@ function AppContent() {
   const addRecipeToShopping = async (recipe: Recipe) => {
     for (const item of recipe.ingredients) {
       const owned = pantry.some(p => p.ingredient_name === normalizeIngredient(item.name));
-      if (!owned) await addShopping(item.name, 1, "مقدار لازم");
+      if (!owned) await addShopping(item.name, 1, ingredientSeeds.find(seed => seed.name === normalizeIngredient(item.name))?.unit ?? "عدد");
     }
     setSelected(null);
     setTab("لیست خرید");
@@ -234,7 +234,7 @@ function AppContent() {
           const recipe = recipes.find(item => item.id === meal.recipe_id);
           if (recipe) for (const ingredient of recipe.ingredients) {
             if (!pantry.some(item => item.ingredient_name === normalizeIngredient(ingredient.name))) {
-              await addShopping(ingredient.name, 1, "مقدار لازم");
+              await addShopping(ingredient.name, 1, ingredientSeeds.find(seed => seed.name === normalizeIngredient(ingredient.name))?.unit ?? "عدد");
             }
           }
         }

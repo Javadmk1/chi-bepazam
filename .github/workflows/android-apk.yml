@@ -31,7 +31,8 @@ jobs:
           java-version: "17"
 
       - name: Install dependencies
-        run: npm install
+        timeout-minutes: 10
+        run: npm install --no-audit --no-fund --prefer-offline
 
       - name: Verify Expo native dependency versions
         run: npx expo install --check
@@ -60,6 +61,7 @@ jobs:
         run: node scripts/diagnose-expo-autolinking.mjs
 
       - name: Build installable debug APK
+        timeout-minutes: 25
         working-directory: android
         run: ./gradlew assembleDebug
 

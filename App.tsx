@@ -32,6 +32,7 @@ function AppContent() {
   const [modal, setModal] = useState(false);
   const [newName, setNewName] = useState("");
   const [newQty, setNewQty] = useState("1");
+  const [newExpiry, setNewExpiry] = useState("");
   const [selected, setSelected] = useState<Recipe | null>(null);
   const [planPickerDate, setPlanPickerDate] = useState<string | null>(null);
   const [pantryFilter, setPantryFilter] = useState("همه");
@@ -40,7 +41,7 @@ function AppContent() {
   const [allergyInput, setAllergyInput] = useState("");
 
   const loadData = async () => {
-    const p = await db.getAllAsync<PantryItem>("SELECT id, ingredient_name, quantity, unit FROM pantry WHERE deleted = 0 ORDER BY ingredient_name");
+    const p = await db.getAllAsync<PantryItem>("SELECT id, ingredient_name, quantity, unit, expires_at FROM pantry WHERE deleted = 0 ORDER BY ingredient_name");
     const s = await db.getAllAsync<ShoppingItem>("SELECT id, ingredient_name, quantity, unit, checked FROM shopping_items ORDER BY checked, ingredient_name");
     const plan = await db.getAllAsync<PlanItem>("SELECT id, meal_date, meal_type, recipe_id FROM meal_plan ORDER BY meal_date");
     const prefs = await db.getFirstAsync<UserPreferences>("SELECT diet, allergies_json, household_size, weekly_budget FROM user_preferences WHERE id = 1");
@@ -52,12 +53,12 @@ function AppContent() {
 
   useEffect(() => { loadData().catch(() => Alert.alert("خطا", "خواندن اطلاعات محلی انجام نشد.")); }, []);
 
-  const addPantry = async (name: string, qty = 1) => {
+  const addPantry = async (name: string, qty = 1, expiresAt: string | null = null) => {
     const normalized = normalizeIngredient(name);
     const seed = ingredientSeeds.find(x => x.name === normalized);
     await db.runAsync(
-      "INSERT INTO pantry (ingredient_name, quantity, unit, updated_at, deleted) VALUES (?, ?, ?, CURRENT_TIMESTAMP, 0) ON CONFLICT(ingredient_name) DO UPDATE SET quantity = quantity + excluded.quantity, updated_at = CURRENT_TIMESTAMP, deleted = 0",
-      normalized, Math.max(1, qty), seed?.unit ?? "عدد"
+      "INSERT INTO pantry (ingredient_name, quantity, unit, expires_at, updated_at, deleted) VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP, 0) ON CONFLICT(ingredient_name) DO UPDATE SET quantity = quantity + excluded.quantity, expires_at = COALESCE(excluded.expires_at, pantry.expires_at), updated_at = CURRENT_TIMESTAMP, deleted = 0",
+      normalized, Math.max(0.01, qty), seed?.unit ?? "عدد", expiresAt
     );
     await loadData();
   };
@@ -164,10 +165,10 @@ function AppContent() {
       <TextInput value={query} onChangeText={setQuery} placeholder="جستجو در مواد..." placeholderTextColor={C.muted} style={styles.search}/>
       <View style={styles.filterRow}>{["همه", "سبزیجات", "لبنیات و پروتئین"].map(x => <Pressable key={x} onPress={() => setPantryFilter(x)} style={[styles.chip, pantryFilter === x && styles.chipActive]}><Text style={[styles.chipText, pantryFilter === x && styles.chipTextActive]}>{x}</Text></Pressable>)}</View>
       {pantry.filter(p => p.ingredient_name.includes(query) && (pantryFilter === "همه" || ingredientSeeds.find(i => i.name === p.ingredient_name)?.category === pantryFilter)).map(item => (
-        <View key={item.id} style={styles.listRow}><View style={styles.ingredientIcon}><Text>🥬</Text></View><View style={styles.listMain}><Text style={styles.listTitle}>{item.ingredient_name}</Text><Text style={styles.muted}>{item.quantity} {item.unit}</Text></View><Pressable onPress={() => removePantry(item)} hitSlop={10}><Ionicons name="trash-outline" size={19} color={C.red}/></Pressable></View>
+        <View key={item.id} style={styles.listRow}><View style={styles.ingredientIcon}><Text>🥬</Text></View><View style={styles.listMain}><Text style={styles.listTitle}>{item.ingredient_name}</Text><Text style={styles.muted}>{item.quantity} {item.unit}</Text><Text style={styles.muted}>{item.expires_at ? `انقضا: ${item.expires_at}` : "تاریخ انقضا ثبت نشده"}</Text></View><Pressable onPress={() => db.runAsync("UPDATE pantry SET quantity = MAX(0, quantity - 1), updated_at = CURRENT_TIMESTAMP WHERE id = ?", item.id).then(loadData)} hitSlop={8}><Ionicons name="remove-circle-outline" size={20} color={C.gold}/></Pressable><Pressable onPress={() => db.runAsync("UPDATE pantry SET quantity = quantity + 1, updated_at = CURRENT_TIMESTAMP WHERE id = ?", item.id).then(loadData)} hitSlop={8}><Ionicons name="add-circle-outline" size={20} color={C.green2}/></Pressable><Pressable onPress={() => removePantry(item)} hitSlop={10}><Ionicons name="trash-outline" size={19} color={C.red}/></Pressable></View>
       ))}
       {pantry.length === 0 ? <View style={styles.empty}><Text style={styles.emptyEmoji}>🧺</Text><Text style={styles.emptyTitle}>انبارت هنوز خالیه</Text><Text style={styles.muted}>چند ماده پرکاربرد اضافه کن تا پیشنهادهای بهتری بگیری.</Text><Pressable style={styles.greenButton} onPress={addQuickItems}><Text style={styles.greenButtonText}>افزودن مواد پرکاربرد</Text></Pressable></View> : null}
-      <Pressable style={styles.greenButton} onPress={() => { setNewName(""); setNewQty("1"); setModal(true); }}><Ionicons name="add" size={19} color={C.white}/><Text style={styles.greenButtonText}>افزودن ماده غذایی</Text></Pressable>
+      <Pressable style={styles.greenButton} onPress={() => { setNewName(""); setNewQty("1"); setNewExpiry(""); setModal(true); }}><Ionicons name="add" size={19} color={C.white}/><Text style={styles.greenButtonText}>افزودن ماده غذایی</Text></Pressable>
     </ScrollView>
   );
 
@@ -333,8 +334,9 @@ function AppContent() {
         <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : undefined} style={styles.modalShade}>
           <View style={styles.modalCard}><Text style={styles.modalTitle}>افزودن به انبار</Text>
             <TextInput value={newName} onChangeText={setNewName} placeholder="نام ماده غذایی" placeholderTextColor={C.muted} style={styles.input}/>
-            <TextInput value={newQty} onChangeText={setNewQty} keyboardType="numeric" placeholder="تعداد یا مقدار" placeholderTextColor={C.muted} style={styles.input}/>
-            <View style={styles.modalActions}><Pressable style={styles.cancelButton} onPress={() => setModal(false)}><Text style={styles.cancelText}>انصراف</Text></Pressable><Pressable style={styles.greenButtonSmall} onPress={async () => { if (!newName.trim()) { Alert.alert("نام ماده را وارد کن"); return; } await addPantry(newName, Number(newQty) || 1); setModal(false); }}><Text style={styles.greenButtonText}>ذخیره</Text></Pressable></View>
+            <TextInput value={newQty} onChangeText={setNewQty} keyboardType="decimal-pad" placeholder="مقدار موجود" placeholderTextColor={C.muted} style={styles.input}/>
+            <TextInput value={newExpiry} onChangeText={setNewExpiry} placeholder="تاریخ انقضا (اختیاری: ۱۴۰۵/۰۸/۲۰)" placeholderTextColor={C.muted} style={styles.input}/>
+            <View style={styles.modalActions}><Pressable style={styles.cancelButton} onPress={() => setModal(false)}><Text style={styles.cancelText}>انصراف</Text></Pressable><Pressable style={styles.greenButtonSmall} onPress={async () => { if (!newName.trim()) { Alert.alert("نام ماده را وارد کن"); return; } if (newExpiry.trim() && !/^\\d{4}[-/]\\d{1,2}[-/]\\d{1,2}$/.test(newExpiry.trim())) { Alert.alert("فرمت تاریخ", "تاریخ را به شکل 1405/08/20 وارد کن."); return; } await addPantry(newName, Number(newQty) || 1, newExpiry.trim() || null); setModal(false); }}><Text style={styles.greenButtonText}>ذخیره</Text></Pressable></View>
           </View>
         </KeyboardAvoidingView>
       </Modal>

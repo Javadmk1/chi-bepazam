@@ -30,7 +30,7 @@ export const ingredientSeeds: IngredientSeed[] = [
   { name: "لوبیا چیتی", category: "حبوبات", unit: "گرم", aliases: ["pinto beans"] },
   { name: "هویج", category: "سبزیجات", unit: "عدد", aliases: ["carrot"] },
   { name: "تن ماهی", category: "گوشت و پروتئین", unit: "قوطی", aliases: ["تن", "tuna"] },
-  { name: "ذرت", category: "سبزیجات", unit: "گرم", aliases: ["corn"] }
+  { name: "ذرت", category: "سبزیجات", unit: "گرم", aliases: ["corn"] },
   { name: "رشته آش", category: "غلات", unit: "گرم", aliases: [] },
   { name: "نخود", category: "حبوبات", unit: "گرم", aliases: [] },
   { name: "سبزی آش", category: "سبزیجات", unit: "گرم", aliases: [] },
